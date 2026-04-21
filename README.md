@@ -151,4 +151,4 @@ Happy to have a no-pressure call to see if I'm a fit for what you're building �
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see [LICENSE](./LICENSE.md).
