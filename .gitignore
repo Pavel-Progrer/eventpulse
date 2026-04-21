@@ -1,0 +1,135 @@
+# =============================================================================
+# EventPulse — .gitignore
+# PHP 8.4 · Laravel 12 · Docker · PostgreSQL · Redis
+# =============================================================================
+
+
+# =============================================================================
+# Environment & secrets — NEVER commit these
+# =============================================================================
+.env
+.env.*
+!.env.example
+!.env.testing.example
+
+
+# =============================================================================
+# Laravel (root: src/)
+# =============================================================================
+/src/bootstrap/cache/*
+!/src/bootstrap/cache/.gitkeep
+
+/src/storage/app/*
+!/src/storage/app/.gitkeep
+!/src/storage/app/public/.gitkeep
+
+/src/storage/framework/cache/*
+!/src/storage/framework/cache/.gitkeep
+/src/storage/framework/sessions/*
+!/src/storage/framework/sessions/.gitkeep
+/src/storage/framework/views/*
+!/src/storage/framework/views/.gitkeep
+/src/storage/framework/testing/
+
+/src/storage/logs/*
+!/src/storage/logs/.gitkeep
+
+/src/public/hot
+/src/public/storage
+/src/public/build
+
+
+# =============================================================================
+# Composer / PHP
+# =============================================================================
+/src/vendor/
+/src/composer.lock      # remove this line if you want to lock deps (recommended for apps)
+
+# Psalm / PHPStan caches
+/src/.psalm/
+/src/.phpstan/
+/src/.phpstan_cache/
+/src/psalm.cache
+
+
+# =============================================================================
+# Testing & coverage
+# =============================================================================
+/src/.phpunit.cache/
+/src/coverage/
+/src/coverage-html/
+/src/coverage.xml
+/src/clover.xml
+/src/junit.xml
+/src/.phpunit.result.cache
+
+
+# =============================================================================
+# Docker
+# =============================================================================
+# Ignore local override files but keep the base compose file
+docker-compose.override.yml
+
+# Persistent data volumes mounted locally during development
+.docker/data/
+.docker/logs/
+
+
+# =============================================================================
+# Node / frontend tooling (if added later)
+# =============================================================================
+/src/node_modules/
+/src/npm-debug.log
+/src/yarn-error.log
+/src/package-lock.json
+/src/yarn.lock
+/src/.vite/
+
+
+# =============================================================================
+# IDE & editors
+# =============================================================================
+# PhpStorm / IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# Vim / Neovim
+*.swp
+*.swo
+Session.vim
+
+# Emacs
+*~
+\#*\#
+
+
+# =============================================================================
+# Operating system
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+
+
+# =============================================================================
+# Miscellaneous
+# =============================================================================
+*.log
+*.cache
+*.bak
+*.tmp
