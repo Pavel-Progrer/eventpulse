@@ -6,77 +6,137 @@
 #   - Hot reload: source is bind-mounted, OPcache revalidates every request
 #   - Xdebug ready: just set a breakpoint in your IDE and go
 #   - Named volumes for Composer cache so installs stay fast between rebuilds
+#
+# Services overview:
+#   nginx      → serves HTTP, proxies to php-fpm
+#   php-fpm    → Laravel application process
+#   worker     → Laravel queue worker (same image as php-fpm, different command)
+#   postgres   → primary database
+#   redis      → queue backend + cache
+#   mailpit    → local SMTP catcher, web UI at :8025
 
 services:
 
   # ── NGINX ──────────────────────────────────────────────────────────────────
   nginx:
-    image: nginx:1.25-alpine        # alpine = small image, fast pull
-    container_name: myapp_nginx
+    image: nginx:1.25-alpine
+    container_name: eventpulse_nginx
     ports:
-      - "8080:80"                   # http://localhost:8080 in browser
-      - "8443:443"                  # optional self-signed HTTPS (see conf)
+      - "8080:80"
+      - "8443:443"
     volumes:
-      # Shared source mount: same path as PHP-FPM so SCRIPT_FILENAME matches
-      - ./src:/var/www/html:ro      # ro = Nginx only reads files, never writes
+      - ./src:/var/www/html:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      # Persist Nginx logs between restarts for analysis
       - nginx_logs:/var/log/nginx
     depends_on:
       - php-fpm
     networks:
       - eventpulse-net
-    # Restart on config errors during dev so you don't wonder why it's dead
     restart: unless-stopped
 
   # ── PHP-FPM ────────────────────────────────────────────────────────────────
   php-fpm:
     build:
-      context: ./docker/php
-      dockerfile: Dockerfile
-    container_name: myapp_phpfpm
+      # Build context is the project root so the Dockerfile can reach
+      # docker/php/* config files if needed. The Dockerfile itself lives
+      # in docker/php/.
+      context: .
+      dockerfile: docker/php/Dockerfile
+    image: eventpulse_php:dev         # name the built image so worker can reuse it
+    container_name: eventpulse_phpfpm
     ports:
-      # Expose 9000 to host so external tools (e.g. cgi-fcgi) can hit FPM directly
-      # In production this would NEVER be exposed — dev only
       - "9000:9000"
     volumes:
-      # rw: PHP needs to write sessions, upload_tmp, opcache file cache
       - ./src:/var/www/html:rw
-      # Config files — edit on host, takes effect on container restart
       - ./docker/php/php.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
       - ./docker/php/xdebug.ini:/usr/local/etc/php/conf.d/99-xdebug.ini:ro
       - ./docker/php/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf:ro
-      # Named volume: keeps Composer's cache between image rebuilds
-      - composer_cache:/root/.composer/cache
+      - composer_cache:/home/www-data/.composer/cache
     environment:
-      # Available in PHP via $_ENV or getenv() — no .env parsing needed in dev
       APP_ENV:   development
       APP_DEBUG: "true"
-      # Xdebug needs to reach back to your machine — host.docker.internal
-      # resolves to the host on Docker Desktop (Mac/Win) and most Linux setups
       XDEBUG_CONFIG: "client_host=host.docker.internal"
-      PHP_IDE_CONFIG: "serverName=myapp"    # must match IDE server name setting
+      PHP_IDE_CONFIG: "serverName=eventpulse"
+    depends_on:
+      - postgres
+      - redis
     networks:
       - eventpulse-net
     restart: unless-stopped
 
-  # ── MAILPIT (local SMTP catcher) ───────────────────────────────────────────
-  # Catches all outgoing mail — nothing actually sends. Web UI at :8025
+  # ── QUEUE WORKER ───────────────────────────────────────────────────────────
+  # Reuses the same image as php-fpm — no separate build, no separate Dockerfile.
+  # The only difference is the command: queue:work instead of php-fpm.
+  #
+  # Key point: `image: eventpulse_php:dev` refers to the image built by the
+  # php-fpm service above. `depends_on: php-fpm` ensures php-fpm builds first.
+  # No `build:` block here — that is what caused the original error.
+  worker:
+    image: eventpulse_php:dev
+    container_name: eventpulse_worker
+    volumes:
+      - ./src:/var/www/html:rw
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
+      - composer_cache:/home/www-data/.composer/cache
+    working_dir: /var/www/html
+    command: ["php", "artisan", "queue:work", "redis",
+              "--tries=3", "--timeout=60", "--sleep=3"]
+    environment:
+      APP_ENV: development
+    depends_on:
+      - php-fpm          # ensures the image is built before worker tries to use it
+      - redis
+      - postgres
+    networks:
+      - eventpulse-net
+    restart: unless-stopped
+
+  # ── POSTGRESQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: eventpulse_postgres
+    ports:
+      - "5432:5432"                   # expose to host for GUI tools (TablePlus etc.)
+    environment:
+      POSTGRES_DB:       eventpulse
+      POSTGRES_USER:     eventpulse
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - eventpulse-net
+    restart: unless-stopped
+
+  # ── REDIS ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: eventpulse_redis
+    ports:
+      - "6379:6379"                   # expose to host for redis-cli / RedisInsight
+    volumes:
+      - redis_data:/data
+    networks:
+      - eventpulse-net
+    restart: unless-stopped
+
+  # ── MAILPIT ────────────────────────────────────────────────────────────────
   mailpit:
     image: axllent/mailpit:latest
-    container_name: myapp_mail
+    container_name: eventpulse_mail
     ports:
-      - "8025:8025"                 # web UI
-      - "1025:1025"                 # SMTP — point PHP's SMTP here
+      - "8025:8025"                   # web UI
+      - "1025:1025"                   # SMTP — point Laravel's MAIL_HOST here
     networks:
       - eventpulse-net
 
-# ── NAMED VOLUMES ─────────────────────────────────────────────────────────────
+# ── NAMED VOLUMES ──────────────────────────────────────────────────────────────
 volumes:
-  composer_cache:   # survives `docker compose down`, lost on `down -v`
+  composer_cache:
   nginx_logs:
+  postgres_data:
+  redis_data:
 
-# ── NETWORK ───────────────────────────────────────────────────────────────────
+# ── NETWORK ────────────────────────────────────────────────────────────────────
 networks:
   eventpulse-net:
     driver: bridge

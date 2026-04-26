@@ -1,53 +1,71 @@
 # docker/php/Dockerfile
+#
+# DEV image only.
+#
+# Philosophy:
+#   - Install system deps and PHP extensions needed to run Laravel + EventPulse.
+#   - Do NOT copy source code. Source arrives via bind-mount at runtime.
+#   - Do NOT run composer install. That runs against the mounted volume.
+#   - Xdebug is included here because this image never goes to production.
+#
+# Production uses a separate multi-stage Dockerfile (docker/php/Dockerfile.prod)
+# introduced in Phase 2 (v0.2.0). See ADR-0006.
 
-# Use the official FPM variant — includes php-fpm binary, no web server
-FROM php:8.3-fpm
+FROM php:8.3-fpm-alpine
 
-# ── SYSTEM DEPENDENCIES ───────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Needed by common PHP extensions
-    libpq-dev \
-    libzip-dev \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libicu-dev \
-    libxml2-dev \
-    # Dev quality-of-life tools inside the container
-    git \
-    curl \
-    unzip \
-    vim \
-    procps \
-    # ps, top — for inspecting FPM workers inside container
-    && rm -rf /var/lib/apt/lists/*
+# ── System dependencies ───────────────────────────────────────────────────────
+# autoconf + g++ + make → required by PECL to compile extensions from source
+# oniguruma-dev         → mbstring
+# libpq-dev             → pgsql, pdo_pgsql
+# libzip-dev            → zip (Composer needs it)
+# icu-dev               → intl
+# linux-headers         → required by Xdebug on Alpine
+RUN apk add --no-cache \
+        autoconf \
+        g++ \
+        make \
+        oniguruma-dev \
+        libpq-dev \
+        libzip-dev \
+        icu-dev \
+        linux-headers \
+        git \
+        unzip \
+        curl
 
-# ── PHP EXTENSIONS ────────────────────────────────────────────────────────────
-RUN docker-php-ext-configure gd \
-        --with-freetype \
-        --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
+# ── PHP extensions ────────────────────────────────────────────────────────────
+RUN docker-php-ext-install \
         pdo \
         pdo_pgsql \
-        pdo_mysql \
+        pgsql \
+        mbstring \
         zip \
-        gd \
         intl \
+        pcntl \
         bcmath \
-        opcache \
-        sockets
+        opcache
 
-# ── XDEBUG ────────────────────────────────────────────────────────────────────
-# pecl install gives us the latest stable — pin a version in production
+# ── Redis extension (via PECL) ────────────────────────────────────────────────
+RUN pecl install redis \
+    && docker-php-ext-enable redis
+
+# ── Xdebug (dev only — never in prod image) ───────────────────────────────────
 RUN pecl install xdebug \
     && docker-php-ext-enable xdebug
 
-# ── COMPOSER ──────────────────────────────────────────────────────────────────
+# ── Composer ──────────────────────────────────────────────────────────────────
+# Copy the binary from the official Composer image so we don't pin a version
+# in curl/wget. Composer updates independently of PHP.
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# ── WORKING DIRECTORY ─────────────────────────────────────────────────────────
+# ── Working directory ─────────────────────────────────────────────────────────
+# Must match the bind-mount target in docker-compose.yml
 WORKDIR /var/www/html
 
-# Don't run as root in dev either — good habit that mirrors prod
-# www-data (uid 33) is the default FPM user in this image
+# Run as www-data so files created inside the container are writable by Nginx.
+# The bind-mount on the host side should be owned by your user (uid 1000 on
+# most Linux machines). If you hit permission errors, see docs/dev-setup.md.
 USER www-data
+
+EXPOSE 9000
+CMD ["php-fpm"]
