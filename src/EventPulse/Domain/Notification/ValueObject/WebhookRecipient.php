@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * A reference to a registered WebhookDestination, carried by its UUID.
@@ -25,7 +26,7 @@ final class WebhookRecipient extends Recipient
     public static function fromDestinationId(string $destinationId): self
     {
         if (!self::isValidUuid($destinationId)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf('"%s" is not a valid WebhookDestination id.', $destinationId)
             );
         }

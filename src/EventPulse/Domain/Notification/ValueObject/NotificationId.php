@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 use EventPulse\Domain\Shared\UuidGenerator;
 
 
@@ -32,7 +33,7 @@ final class NotificationId
     public static function fromString(string $value): self
     {
         if (!self::isValidUuid($value)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf('"%s" is not a valid NotificationId (expected UUID v4).', $value)
             );
         }
