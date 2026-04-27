@@ -53,7 +53,7 @@ services:
       - ./docker/php/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf:ro
       - composer_cache:/home/www-data/.composer/cache
     environment:
-      APP_ENV:   development
+      APP_ENV:   local
       APP_DEBUG: "true"
       XDEBUG_CONFIG: "client_host=host.docker.internal"
       PHP_IDE_CONFIG: "serverName=eventpulse"
@@ -93,7 +93,7 @@ services:
 
   # ── POSTGRESQL ─────────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: eventpulse_postgres
     ports:
       - "5432:5432"                   # expose to host for GUI tools (TablePlus etc.)

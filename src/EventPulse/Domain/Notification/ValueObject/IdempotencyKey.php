@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * A caller-supplied string that de-duplicates repeated submissions of the
@@ -33,7 +34,7 @@ final class IdempotencyKey
         $length = strlen($value);
 
         if ($length < self::MIN_LENGTH || $length > self::MAX_LENGTH) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf(
                     'IdempotencyKey must be between %d and %d characters; got %d.',
                     self::MIN_LENGTH,
@@ -45,7 +46,7 @@ final class IdempotencyKey
 
         // Reject non-printable characters and non-ASCII bytes.
         if (!preg_match('/^[\x21-\x7E]+$/', $value)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 'IdempotencyKey must contain only printable ASCII characters (0x21–0x7E).'
             );
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * An email address.
@@ -23,7 +24,7 @@ final class EmailRecipient extends Recipient
         $normalised = strtolower(trim($address));
 
         if (filter_var($normalised, FILTER_VALIDATE_EMAIL) === false) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf('"%s" is not a valid email address.', $address)
             );
         }

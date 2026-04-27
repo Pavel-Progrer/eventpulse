@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * An E.164 phone number (e.g. +381641234567).
@@ -21,7 +22,7 @@ final class SmsRecipient extends Recipient
     public static function fromE164(string $phoneNumber): self
     {
         if (!preg_match('/^\+[1-9]\d{1,14}$/', $phoneNumber)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf('"%s" is not a valid E.164 phone number.', $phoneNumber)
             );
         }

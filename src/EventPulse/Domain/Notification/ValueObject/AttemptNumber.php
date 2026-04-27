@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * An integer ≥ 1 representing the ordinal of a dispatch attempt
@@ -27,7 +28,7 @@ final class AttemptNumber
     public static function fromInt(int $value): self
     {
         if ($value < 1) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf('AttemptNumber must be ≥ 1; got %d.', $value)
             );
         }

@@ -58,41 +58,97 @@ git clone https://github.com/Pavel-Progrer/eventpulse.git
 cd eventpulse
 cp .env.example .env
 docker-compose up -d
-docker-compose exec app php artisan migrate
-docker-compose exec app php artisan key:generate
+docker-compose exec php-fpm php artisan key:generate
+docker-compose exec php-fpm php artisan migrate
 ```
 
 The API will be available at `http://localhost:8080`. An OpenAPI spec is published at `/api/docs` from `v0.1.0` onward.
 
+### Environment variables
+
+Configuration is split across two files, both gitignored, both with committed `.example` counterparts:
+
+- **`.env`** — local development. Copy from `.env.example` after cloning.
+- **`.env.testing`** — overrides applied when `APP_ENV=testing` (set globally by `phpunit.xml`). Covered in [Setting up the test environment](#setting-up-the-test-environment) below.
+
+Hostnames in both files refer to **Docker service names** (`postgres`, `redis`, `mailpit`) — these resolve inside the `eventpulse-net` bridge network defined by `docker-compose.yaml`. If you ever run `php artisan` from your host shell rather than through `docker-compose exec`, swap them for `127.0.0.1`.
+
+| Variable | `.env` (dev) | `.env.testing` | Notes |
+|---|---|---|---|
+| `APP_ENV` | `local` | `testing` | Drives which env file Laravel loads. |
+| `APP_KEY` | (generated) | (generated) | Encrypts `webhook_destinations.secret`; see [ADR-0007](./docs/adr/0007-secrets-management.md). |
+| `DB_CONNECTION` | `pgsql` | `pgsql` | Required — migrations use `jsonb` and `TIMESTAMPTZ`. |
+| `DB_HOST` | `postgres` | `postgres` | Compose service name. |
+| `DB_DATABASE` | `eventpulse` | `eventpulse_test` | Separate databases prevent `RefreshDatabase` from erasing dev data. |
+| `REDIS_HOST` | `redis` | `redis` | Queue backend + idempotency store + cache. |
+| `QUEUE_CONNECTION` | `redis` | `sync` | Tests run jobs synchronously; nothing is enqueued. |
+| `CACHE_STORE` | `redis` | `array` | Tests use in-memory cache; nothing leaks between runs. |
+| `MAIL_MAILER` | `smtp` | `array` | Dev mail goes to Mailpit (UI at `http://localhost:8025`); tests collect mail in memory. |
+| `ANTHROPIC_API_KEY` | empty until Phase 3 | empty | LLM provider; see ADR-0010. |
+| `OPENAI_API_KEY` | empty until Phase 3 | empty | Fallback provider. |
+
+Secrets handling follows [ADR-0007](./docs/adr/0007-secrets-management.md): no `.env` file is ever committed, production injects environment variables via the orchestrator's secret mechanism, and `gitleaks` runs in CI as defence-in-depth.
+
 ### Making a test request
 
 ```bash
-curl -X POST http://localhost:8080/api/notifications \
+curl -X POST http://localhost:8080/api/v1/notifications \
   -H "Authorization: Bearer $API_KEY" \
   -H "Idempotency-Key: $(uuidgen)" \
   -H "Content-Type: application/json" \
   -d '{
-    "channel": "webhook",
-    "recipient": "https://httpbin.org/post",
-    "payload": {"message": "hello from EventPulse"}
+    "channel": "email",
+    "recipient": "user@example.com",
+    "payload": {
+      "subject": "Hello from EventPulse",
+      "body_text": "Plain text body."
+    }
   }'
 ```
+
+API keys are provisioned via Artisan command (no self-service signup; see [ADR-0001](./docs/adr/0001-scope-and-exclusions.md)).
 
 ---
 
 ## Testing
 
+### Setting up the test environment
+
+The feature suite uses Laravel's `RefreshDatabase` trait, which re-runs migrations against the configured database between test classes. It must therefore point at a **separate database** — pointing it at `eventpulse` would erase your local development data.
+
+A SQLite-in-memory fallback (a common Laravel shortcut) isn't viable here: the migrations rely on PostgreSQL features that SQLite doesn't implement (`jsonb`, `TIMESTAMPTZ`, `CHECK` constraints).
+
+**One-time setup, after `docker-compose up -d`:**
+
 ```bash
-docker-compose exec app php artisan test                    # full suite
-docker-compose exec app php artisan test --testsuite=Unit
-docker-compose exec app php artisan test --testsuite=Feature
+# Create the dedicated test database on the same Postgres instance.
+docker-compose exec postgres psql -U eventpulse -d eventpulse \
+    -c "CREATE DATABASE eventpulse_test OWNER eventpulse;"
+
+# Configure the test environment.
+cp .env.testing.example .env.testing
+docker-compose exec php-fpm php artisan key:generate --env=testing
+```
+
+`.env.testing` carries database credentials and test-shape settings (`QUEUE_CONNECTION=sync`, `CACHE_STORE=array`, `MAIL_MAILER=array`) that keep test runs hermetic — no Redis writes, no mail dispatched, no jobs queued.
+
+`phpunit.xml` only contains constants that should be identical on every developer's machine (`APP_ENV=testing`, `BCRYPT_ROUNDS=4` for hash-comparison speed). Credentials live in `.env.testing` to keep secrets out of version control.
+
+`RefreshDatabase` migrates the test database on its first run, so you do not need to run `php artisan migrate --env=testing` manually after creating the database.
+
+### Running the suite
+
+```bash
+docker-compose exec php-fpm php artisan test                    # full suite
+docker-compose exec php-fpm php artisan test --testsuite=Unit
+docker-compose exec php-fpm php artisan test --testsuite=Feature
 ```
 
 The suite is split deliberately:
 
 - **Unit** — pure domain logic, no framework, no I/O. Fast.
 - **Integration** — queue behavior, database repositories, third-party adapters (mocked at the HTTP boundary).
-- **Feature** — full HTTP round-trips against a test database.
+- **Feature** — full HTTP round-trips against the test database.
 
 Testing philosophy and conventions are in [`docs/testing-strategy.md`](./docs/testing-strategy.md).
 
@@ -112,8 +168,8 @@ Testing philosophy and conventions are in [`docs/testing-strategy.md`](./docs/te
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| Runtime | PHP 8.3 / Laravel 11 | Mature ecosystem, excellent queue and testing tooling |
-| Primary store | PostgreSQL 16 | ACID, JSON support, pgvector extension for Phase 3 |
+| Runtime | PHP 8.4 / Laravel 12 | Mature ecosystem, excellent queue and testing tooling |
+| Primary store | PostgreSQL 17 | ACID, JSON support, pgvector extension for Phase 3 |
 | Queue / cache | Redis 7 | Queue backend, idempotency key store, cache layer |
 | Container | Docker (distroless final) | ~80MB runtime image, minimal attack surface *(v0.2.0)* |
 | CI/CD | GitHub Actions | Tests, Psalm, PHPStan, Trivy, composer audit *(v0.2.0)* |

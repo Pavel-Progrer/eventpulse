@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EventPulse\Domain\Notification\ValueObject;
 
 use EventPulse\Domain\Notification\Enum\Channel;
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * The content to be delivered, validated against the channel it will travel on
@@ -83,14 +84,14 @@ final class NotificationPayload
     private static function validateEmail(array $data): void
     {
         if (empty($data['subject']) || !is_string($data['subject'])) {
-            throw new \InvalidArgumentException('Email payload must include a non-empty string "subject".');
+            throw new InvalidNotificationInputException('Email payload must include a non-empty string "subject".');
         }
 
         $hasText = isset($data['text']) && is_string($data['text']) && $data['text'] !== '';
         $hasHtml = isset($data['html']) && is_string($data['html']) && $data['html'] !== '';
 
         if (!$hasText && !$hasHtml) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 'Email payload must include at least one of "text" or "html" body.'
             );
         }
@@ -107,7 +108,7 @@ final class NotificationPayload
     private static function validateWebhook(array $data): void
     {
         if (empty($data)) {
-            throw new \InvalidArgumentException('Webhook payload must not be empty.');
+            throw new InvalidNotificationInputException('Webhook payload must not be empty.');
         }
     }
 
@@ -121,11 +122,11 @@ final class NotificationPayload
     private static function validateSms(array $data): void
     {
         if (empty($data['body']) || !is_string($data['body'])) {
-            throw new \InvalidArgumentException('SMS payload must include a non-empty string "body".');
+            throw new InvalidNotificationInputException('SMS payload must include a non-empty string "body".');
         }
 
         if (mb_strlen($data['body']) > 1600) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf(
                     'SMS body must not exceed 1600 characters; got %d.',
                     mb_strlen($data['body'])

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
+use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 use EventPulse\Domain\Shared\UuidGenerator;
 
 
@@ -35,13 +36,13 @@ final class CorrelationId
     public static function fromString(string $value): self
     {
         if (strlen($value) === 0 || strlen($value) > self::MAX_LENGTH) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 sprintf('CorrelationId must be 1–%d characters.', self::MAX_LENGTH)
             );
         }
 
         if (!preg_match('/^[\x21-\x7E]+$/', $value)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidNotificationInputException(
                 'CorrelationId must contain only printable ASCII characters.'
             );
         }
