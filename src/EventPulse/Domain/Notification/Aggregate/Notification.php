@@ -464,6 +464,45 @@ final class Notification
         return count($this->attempts);
     }
 
+    /**
+     * Whether this aggregate's request data matches a fresh submission's.
+     *
+     * Used by the application layer (`SubmitNotificationHandler`) when an
+     * `Idempotency-Key` collides with an existing notification: a match means
+     * "same logical submission" → idempotent replay; a mismatch means
+     * "different logical submission" → 409 conflict.
+     *
+     * Comparison fields are exactly those that constitute the request body
+     * (per the OpenAPI `CreateNotificationRequest` schema):
+     *   - channel, recipient, payload, priority.
+     *
+     * Out of scope on purpose:
+     *   - idempotency key (we already know it matches — that is why we are
+     *     comparing in the first place).
+     *   - api_key_id (already matched — idempotency keys are scoped per key).
+     *   - correlation id (a per-request tracing token, not part of the
+     *     logical submission).
+     *   - timestamps (the prior submission's `createdAt` differs from "now"
+     *     by definition; comparing them would always report "conflict").
+     *
+     * Why a method on the aggregate rather than a comparison utility in the
+     * handler: the *rule* for "what counts as the same submission" is a
+     * domain concern (it follows directly from invariant 5.1.8). Centralising
+     * it here means a future change to the request body shape needs to be
+     * reflected in exactly one place.
+     */
+    public function matchesSubmission(
+        Channel $channel,
+        Recipient $recipient,
+        NotificationPayload $payload,
+        Priority $priority,
+    ): bool {
+        return $this->channel === $channel
+            && $this->recipient->equals($recipient)
+            && $this->payload->equals($payload)
+            && $this->priority === $priority;
+    }
+
     // ---------------------------------------------------------------------------
     // Reconstitution — used by the repository to rebuild from persistence
     // ---------------------------------------------------------------------------
