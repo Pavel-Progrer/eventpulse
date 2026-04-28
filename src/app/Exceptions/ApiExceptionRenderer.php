@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use EventPulse\Application\Notification\Exception\IdempotencyConflictException;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationTransitionException;
 use EventPulse\Domain\Notification\Exception\RecipientChannelMismatchException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -25,6 +25,23 @@ use Throwable;
  * Returns null when the exception does not match a known mapping; the caller
  * (the `withExceptions` closure) treats null as "fall through to Laravel's
  * default rendering." Returning a JsonResponse short-circuits.
+ *
+ * Envelope contract:
+ *   - `error.code`     — machine-readable error type (stable; clients branch on this).
+ *   - `error.message`  — client-facing copy, written for end-users. Stable across
+ *                        versions; safe for UIs to display verbatim. Never
+ *                        sourced from `Throwable::getMessage()` directly.
+ *   - `error.details`  — structured supplementary data. Includes `reason` for
+ *                        engineer-facing diagnostic strings (the raw exception
+ *                        message), plus error-specific fields like
+ *                        `idempotency_key` or `fields` (for ValidationError).
+ *
+ * The split between `message` and `details.reason` exists because domain
+ * exception messages reference internal terminology (state names, VO
+ * factory names, field identifiers) that is correct for engineers reading
+ * logs but inappropriate as user-facing copy. Keeping the boundary explicit
+ * means the surface clients build against does not silently shift when a
+ * domain exception's message text is reworded.
  */
 final class ApiExceptionRenderer
 {
@@ -43,29 +60,64 @@ final class ApiExceptionRenderer
         }
 
         if ($e instanceof RecipientChannelMismatchException) {
+            // The message on the domain exception describes which value failed
+            // (e.g. mentions VO class names). That belongs in the diagnostic,
+            // not in `error.message` — the latter is client-facing copy that
+            // UIs may show verbatim and that we want stable across versions.
             return $this->envelope(
                 code:          'VALIDATION_ERROR',
-                message:       $e->getMessage(),
+                message:       'The recipient is not compatible with the requested channel.',
                 status:        Response::HTTP_UNPROCESSABLE_ENTITY,
                 correlationId: $correlationId,
+                details:       ['reason' => $e->getMessage()],
+            );
+        }
+
+        if ($e instanceof IdempotencyConflictException) {
+            // 409 specifically: the request is well-formed but conflicts with a
+            // previously stored submission under the same Idempotency-Key. The
+            // OpenAPI contract names this distinctly from a 422 because the
+            // resolution is different — the caller must compare against the
+            // original submission, not just fix a malformed field.
+            //
+            // The exception's own message string-interpolates the key value,
+            // which is already in `details.idempotency_key`. Use a stable
+            // message and let the caller read the key from where it belongs.
+            return $this->envelope(
+                code:          'IDEMPOTENCY_CONFLICT',
+                message:       'The Idempotency-Key has already been used with a different request body.',
+                status:        Response::HTTP_CONFLICT,
+                correlationId: $correlationId,
+                details:       [
+                    'idempotency_key' => $e->idempotencyKey()->toString(),
+                ],
             );
         }
 
         if ($e instanceof InvalidNotificationTransitionException) {
+            // The domain message names internal states ("queued → delivered"),
+            // which is engineer-facing diagnostic, not API copy. Expose the
+            // raw message under `details.reason` for debugging while keeping
+            // a stable client-facing message.
             return $this->envelope(
                 code:          'INVALID_STATE',
-                message:       $e->getMessage(),
+                message:       'The notification cannot perform the requested operation in its current state.',
                 status:        Response::HTTP_CONFLICT,
                 correlationId: $correlationId,
+                details:       ['reason' => $e->getMessage()],
             );
         }
 
         if ($e instanceof InvalidNotificationInputException) {
+            // Domain validation messages are written for engineers reading
+            // logs (they may reference VO factory names, internal field
+            // identifiers, etc.). The diagnostic moves to `details.reason`.
             return $this->envelope(
                 code:          'VALIDATION_ERROR',
-                message:       $e->getMessage(),
+                message:       'The request data violates a notification domain rule.',
                 status:        Response::HTTP_UNPROCESSABLE_ENTITY,
                 correlationId: $correlationId,
+                details:       ['reason' => $e->getMessage()],
             );
         }
 
