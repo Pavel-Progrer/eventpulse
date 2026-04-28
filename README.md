@@ -108,6 +108,19 @@ curl -X POST http://localhost:8080/api/v1/notifications \
 
 API keys are provisioned via Artisan command (no self-service signup; see [ADR-0001](./docs/adr/0001-scope-and-exclusions.md)).
 
+### Idempotency and asynchronous dispatch
+
+Every `POST /notifications` request must carry an `Idempotency-Key` header. The contract:
+
+- **First submission** → `202 Accepted`; the notification is persisted, a `DispatchNotificationJob` is enqueued, and the response carries the assigned id.
+- **Same key, identical body, same API key, within 24 h** → `200 OK`; the original response is returned, no second persistence, no second enqueue. The original `correlation_id` is preserved — tracing identity belongs to the first submission.
+- **Same key, *different* body** → `409 Conflict`; the second request is rejected and the original notification remains unchanged.
+- Keys are **scoped per API key**: two callers using the same key value do not collide.
+
+Dedup is done by indexed lookup against the `notifications.idempotency_key` column (composite-unique with `api_key_id`), not by a Redis cache of the response. The trade-offs are documented in `SubmitNotificationHandler`'s docblock; the choice is revisitable if the dedup-replay rate ever dominates the endpoint's latency budget.
+
+Dispatch is asynchronous from acceptance: the HTTP path persists the notification and enqueues a job; the worker picks it up, claims an attempt, and runs the channel-specific dispatch logic. Priority is mapped to a queue name (`notifications-high`, `notifications-default`, `notifications-low`) so workers can be scaled per priority class.
+
 ---
 
 ## Testing

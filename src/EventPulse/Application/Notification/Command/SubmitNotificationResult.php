@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EventPulse\Application\Notification\Command;
 
 use DateTimeImmutable;
+use EventPulse\Domain\Notification\Aggregate\Notification;
 use EventPulse\Domain\Notification\Enum\NotificationStatus;
 use EventPulse\Domain\Notification\ValueObject\CorrelationId;
 use EventPulse\Domain\Notification\ValueObject\NotificationId;
@@ -25,11 +26,10 @@ use EventPulse\Domain\Notification\ValueObject\NotificationId;
  * the caller needs is safer and self-documenting (see ADR-0003 §4).
  *
  * `wasIdempotentReplay` distinguishes a fresh accept (HTTP 202) from a replay
- * of a previously-stored idempotency record (HTTP 200). The actual replay
- * detection logic lands in Day 4; for Day 3 the handler always returns false
- * here, but the field exists so the controller is already wired up correctly.
+ * of a previously-stored idempotency record (HTTP 200). The handler chooses
+ * which named constructor to invoke; callers should never construct this
+ * directly.
  */
-// TODO(Day 4): Day 4 will add idempotency dedup here
 final readonly class SubmitNotificationResult
 {
     public function __construct(
@@ -39,4 +39,39 @@ final readonly class SubmitNotificationResult
         public DateTimeImmutable $createdAt,
         public bool $wasIdempotentReplay = false,
     ) {}
+
+    /**
+     * The result for a freshly accepted submission.
+     *
+     * Maps to HTTP 202 in the controller.
+     */
+    public static function accepted(Notification $notification): self
+    {
+        return new self(
+            id:                  $notification->id(),
+            status:              $notification->status(),
+            correlationId:       $notification->correlationId(),
+            createdAt:           $notification->createdAt(),
+            wasIdempotentReplay: false,
+        );
+    }
+
+    /**
+     * The result for a replay of a previously persisted submission.
+     *
+     * Maps to HTTP 200 in the controller. The aggregate's *current* state is
+     * returned (status, correlation id, created_at) — not the state at the
+     * moment of original submission. A caller polling on idempotent replay
+     * would observe the latest known state.
+     */
+    public static function idempotentReplay(Notification $notification): self
+    {
+        return new self(
+            id:                  $notification->id(),
+            status:              $notification->status(),
+            correlationId:       $notification->correlationId(),
+            createdAt:           $notification->createdAt(),
+            wasIdempotentReplay: true,
+        );
+    }
 }

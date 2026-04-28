@@ -6,12 +6,14 @@ namespace App\Providers;
 
 use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\RequireScope;
+use EventPulse\Application\Notification\NotificationDispatchQueue;
 use EventPulse\Application\Shared\Clock;
+use EventPulse\Application\Shared\DomainEventDispatcher;
+use EventPulse\Application\Shared\NullDomainEventDispatcher;
 use EventPulse\Application\Shared\SystemClock;
 use EventPulse\Domain\Notification\Repository\NotificationRepository;
 use EventPulse\Infrastructure\Notification\Persistence\EloquentNotificationRepository;
-use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Contracts\Http\Kernel;
+use EventPulse\Infrastructure\Notification\Queue\LaravelNotificationDispatchQueue;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,8 +22,10 @@ use Illuminate\Support\ServiceProvider;
  *
  * The container is the seam between Domain/Application interfaces and their
  * Infrastructure implementations:
- *  - `NotificationRepository` (domain) → `EloquentNotificationRepository` (infrastructure).
- *  - `Clock` (application) → `SystemClock` (application; no Laravel deps).
+ *  - `NotificationRepository`     (domain)      → `EloquentNotificationRepository`.
+ *  - `Clock`                      (application) → `SystemClock`.
+ *  - `DomainEventDispatcher`      (application) → `NullDomainEventDispatcher` (Day 8 swaps in the real one).
+ *  - `NotificationDispatchQueue`  (application) → `LaravelNotificationDispatchQueue`.
  *
  * The provider also registers the route middleware aliases so routes can use
  * `auth.api-key` and `scope:notifications:write` rather than fully qualified
@@ -40,13 +44,15 @@ final class EventPulseServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     public array $bindings = [
-        //
+        Clock::class                     => SystemClock::class,
+        DomainEventDispatcher::class     => NullDomainEventDispatcher::class,
+        NotificationRepository::class    => EloquentNotificationRepository::class,
+        NotificationDispatchQueue::class => LaravelNotificationDispatchQueue::class,
     ];
 
     public function register(): void
     {
-        $this->app->singleton(Clock::class, SystemClock::class);
-        $this->app->singleton(NotificationRepository::class, EloquentNotificationRepository::class);
+        // No additional registrations beyond the $bindings declaration.
     }
 
     public function boot(Router $router): void
