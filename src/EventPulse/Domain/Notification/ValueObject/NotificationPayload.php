@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace EventPulse\Domain\Notification\ValueObject;
 
 use EventPulse\Domain\Notification\Enum\Channel;
-use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 
 /**
  * The content to be delivered, validated against the channel it will travel on
@@ -53,10 +52,72 @@ final class NotificationPayload
         return $this->channel;
     }
 
+    /**
+     * Two payloads are equal when they belong to the same channel and carry
+     * the same content, irrespective of the order in which keys were declared.
+     *
+     * Why not a simple `$this->data === $other->data`:
+     *   PHP's strict array equality is order-sensitive for associative arrays.
+     *   Persistence round-trips through PostgreSQL `jsonb` (or any JSON
+     *   transport) do not preserve key order — `jsonb` reorders by hash, and
+     *   `json_decode` rebuilds the array in JSON's textual order. A request
+     *   that submits `{"subject": "x", "text": "y"}` and a replay of the same
+     *   request would compare unequal under `===` after a save/load cycle,
+     *   breaking idempotent replay.
+     *
+     *   We define "same content" semantically: associative arrays are equal
+     *   when they have the same set of keys with equal values; lists (zero-
+     *   indexed sequential arrays) are equal when they have the same elements
+     *   in the same order, because for lists order *is* meaningful (e.g.,
+     *   ordered headers in a webhook).
+     */
     public function equals(self $other): bool
     {
         return $this->channel === $other->channel
-            && $this->data === $other->data;
+            && self::deepEquals($this->data, $other->data);
+    }
+
+    /**
+     * Recursive deep equality for JSON-shaped data.
+     *
+     * Recursion handles nested webhook payloads, where any value may itself
+     * be an array. The leaf comparison is `===`, so scalars must match by
+     * type — `1` and `"1"` are not equal, which matches the strictness the
+     * domain expects elsewhere.
+     */
+    private static function deepEquals(mixed $a, mixed $b): bool
+    {
+        if (is_array($a) && is_array($b)) {
+            if (count($a) !== count($b)) {
+                return false;
+            }
+
+            // Lists (zero-indexed sequential): compare element-wise in order.
+            if (array_is_list($a) || array_is_list($b)) {
+                if (!array_is_list($a) || !array_is_list($b)) {
+                    return false;
+                }
+
+                foreach ($a as $i => $value) {
+                    if (!self::deepEquals($value, $b[$i])) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            // Associative: compare by key set, ignoring declaration order.
+            foreach ($a as $key => $value) {
+                if (!array_key_exists($key, $b) || !self::deepEquals($value, $b[$key])) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return $a === $b;
     }
 
     // ---------------------------------------------------------------------------
@@ -84,14 +145,14 @@ final class NotificationPayload
     private static function validateEmail(array $data): void
     {
         if (empty($data['subject']) || !is_string($data['subject'])) {
-            throw new InvalidNotificationInputException('Email payload must include a non-empty string "subject".');
+            throw new \InvalidArgumentException('Email payload must include a non-empty string "subject".');
         }
 
         $hasText = isset($data['text']) && is_string($data['text']) && $data['text'] !== '';
         $hasHtml = isset($data['html']) && is_string($data['html']) && $data['html'] !== '';
 
         if (!$hasText && !$hasHtml) {
-            throw new InvalidNotificationInputException(
+            throw new \InvalidArgumentException(
                 'Email payload must include at least one of "text" or "html" body.'
             );
         }
@@ -108,7 +169,7 @@ final class NotificationPayload
     private static function validateWebhook(array $data): void
     {
         if (empty($data)) {
-            throw new InvalidNotificationInputException('Webhook payload must not be empty.');
+            throw new \InvalidArgumentException('Webhook payload must not be empty.');
         }
     }
 
@@ -122,11 +183,11 @@ final class NotificationPayload
     private static function validateSms(array $data): void
     {
         if (empty($data['body']) || !is_string($data['body'])) {
-            throw new InvalidNotificationInputException('SMS payload must include a non-empty string "body".');
+            throw new \InvalidArgumentException('SMS payload must include a non-empty string "body".');
         }
 
         if (mb_strlen($data['body']) > 1600) {
-            throw new InvalidNotificationInputException(
+            throw new \InvalidArgumentException(
                 sprintf(
                     'SMS body must not exceed 1600 characters; got %d.',
                     mb_strlen($data['body'])

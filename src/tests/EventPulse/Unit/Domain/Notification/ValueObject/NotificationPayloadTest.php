@@ -179,4 +179,62 @@ final class NotificationPayloadTest extends TestCase
         );
         self::assertFalse($emailPayload->equals($webhookPayload));
     }
+
+    /**
+     * Persistence round-trips through PostgreSQL `jsonb` (and any JSON
+     * transport) do not preserve key declaration order. Equality must be
+     * order-insensitive for associative arrays so a save → load → compare
+     * cycle reports the same payload as equal — this is what makes
+     * idempotent replay work.
+     */
+    public function test_payloads_with_same_keys_in_different_order_are_equal(): void
+    {
+        $a = NotificationPayload::forChannel(
+            ['subject' => 'Hello', 'text' => 'World'],
+            Channel::Email,
+        );
+        $b = NotificationPayload::forChannel(
+            ['text' => 'World', 'subject' => 'Hello'],
+            Channel::Email,
+        );
+        self::assertTrue($a->equals($b));
+    }
+
+    /**
+     * Webhook payloads are arbitrary JSON. Order-insensitive equality must
+     * recurse into nested associative arrays — otherwise nested key
+     * reordering (which `jsonb` may produce) would falsely report a
+     * conflict.
+     */
+    public function test_webhook_payloads_with_nested_keys_in_different_order_are_equal(): void
+    {
+        $a = NotificationPayload::forChannel(
+            ['event' => 'order.created', 'data' => ['a' => 1, 'b' => 2]],
+            Channel::Webhook,
+        );
+        $b = NotificationPayload::forChannel(
+            ['data' => ['b' => 2, 'a' => 1], 'event' => 'order.created'],
+            Channel::Webhook,
+        );
+        self::assertTrue($a->equals($b));
+    }
+
+    /**
+     * Order *is* meaningful inside list-shaped (zero-indexed sequential)
+     * arrays — e.g., an ordered sequence of webhook headers. Reordering
+     * elements of such a list changes the payload's meaning and must
+     * compare unequal.
+     */
+    public function test_webhook_payloads_with_list_elements_in_different_order_are_not_equal(): void
+    {
+        $a = NotificationPayload::forChannel(
+            ['headers' => [['name' => 'X-First'], ['name' => 'X-Second']]],
+            Channel::Webhook,
+        );
+        $b = NotificationPayload::forChannel(
+            ['headers' => [['name' => 'X-Second'], ['name' => 'X-First']]],
+            Channel::Webhook,
+        );
+        self::assertFalse($a->equals($b));
+    }
 }
