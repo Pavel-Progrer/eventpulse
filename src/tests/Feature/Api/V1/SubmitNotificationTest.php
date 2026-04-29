@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1;
 
+use App\Jobs\DispatchNotificationJob;
 use App\Models\ApiKey;
 use EventPulse\Infrastructure\Notification\Persistence\EloquentNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -31,6 +33,8 @@ final class SubmitNotificationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Bus::fake([DispatchNotificationJob::class]);
 
         $this->writerKey = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_001',
