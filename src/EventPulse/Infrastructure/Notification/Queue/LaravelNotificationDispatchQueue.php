@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EventPulse\Infrastructure\Notification\Queue;
 
 use App\Jobs\DispatchNotificationJob;
+use DateTimeImmutable;
 use EventPulse\Application\Notification\NotificationDispatchQueue;
 use EventPulse\Domain\Notification\Enum\Priority;
 use EventPulse\Domain\Notification\ValueObject\CorrelationId;
@@ -23,9 +24,15 @@ use EventPulse\Domain\Notification\ValueObject\NotificationId;
  *  2. Route by priority to one of three queues. The mapping is in
  *     `queueFor()`; rationale lives there.
  *
- * The adapter does not set retry/backoff policy — that lives on the job
- * itself (`tries`, `backoff()`), which is consistent across all enqueue
- * paths (HTTP submission, Day 8 retry-after-failure, Day 5 worker re-claim).
+ * Day 6 widens the contract: an optional `availableAt` timestamp delays
+ * the job's worker pickup. This is how the retry path schedules a
+ * back-off — the job is queued immediately but tagged not-before the
+ * computed retry-after timestamp.
+ *
+ * The adapter does not set retry/backoff policy at the queue level —
+ * `DispatchNotificationJob::$tries = 1` keeps Laravel's queue retry
+ * disabled, and the domain decides retries via `recordFailure`. This
+ * adapter only honours the *scheduling* the domain has already chosen.
  */
 final class LaravelNotificationDispatchQueue implements NotificationDispatchQueue
 {
@@ -34,11 +41,24 @@ final class LaravelNotificationDispatchQueue implements NotificationDispatchQueu
         NotificationId $notificationId,
         CorrelationId $correlationId,
         Priority $priority,
+        ?DateTimeImmutable $availableAt = null,
     ): void {
-        DispatchNotificationJob::dispatch(
+        $pending = DispatchNotificationJob::dispatch(
             $notificationId->toString(),
             $correlationId->toString(),
         )->onQueue($this->queueFor($priority));
+
+        if ($availableAt !== null) {
+            // Laravel's `delay()` accepts `DateTimeInterface|DateInterval|int`.
+            // Passing the absolute timestamp keeps the application's
+            // computed `retry_after` and the queue's "available at" in
+            // exact agreement — a relative delay would re-resolve
+            // against the queue worker's wall clock, drifting from the
+            // value persisted on the `NotificationScheduledForRetry`
+            // event by however much the application-side computation
+            // and the queue dispatch are separated in time.
+            $pending->delay($availableAt);
+        }
     }
 
     /**
