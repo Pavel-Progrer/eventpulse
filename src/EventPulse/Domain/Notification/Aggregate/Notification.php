@@ -72,10 +72,6 @@ final class Notification
     // Construction — factory only, no public constructor
     // ---------------------------------------------------------------------------
 
-    /**
-     * Private constructor enforces use of the factory method.
-     * The aggregate is always born in the `queued` state.
-     */
     private function __construct(
         private readonly NotificationId $id,
         private readonly Channel $channel,
@@ -93,15 +89,6 @@ final class Notification
     /**
      * Creates a new Notification from a caller's dispatch request.
      *
-     * This is the only public path into the aggregate for new instances.
-     * Reconstruction from persistence goes through `reconstitute()`.
-     *
-     * Enforces:
-     *  - Invariant 5.1.9 (recipient/channel match)
-     *  - Invariant 5.1.10 (payload/channel match — delegated to NotificationPayload)
-     *
-     * Raises: NotificationRequested
-     *
      * @param array<string, mixed> $rawPayload Raw payload array; validated by NotificationPayload.
      */
     public static function request(
@@ -118,10 +105,6 @@ final class Notification
     ): self {
         self::assertRecipientMatchesChannel($recipient, $channel);
 
-        // NotificationPayload validates the payload shape for the channel
-        // (invariant 5.1.10). An invalid payload throws here, before the
-        // aggregate exists, so no partially-constructed aggregate is ever
-        // in memory.
         $payload = NotificationPayload::forChannel($rawPayload, $channel);
 
         $notification = new self(
@@ -155,16 +138,6 @@ final class Notification
     // Lifecycle transitions
     // ---------------------------------------------------------------------------
 
-    /**
-     * A worker claims this notification and begins a dispatch attempt.
-     *
-     * Enforces:
-     *  - Invariant 5.1.3 (only one attempt in progress at a time)
-     *  - Invariant 5.1.6 (no transitions from terminal states)
-     *  - Invariant 5.1.2 (attempt numbers are contiguous)
-     *
-     * Raises: NotificationDispatchAttempted
-     */
     public function beginAttempt(DateTimeImmutable $now): Attempt
     {
         $this->assertNotTerminal();
@@ -175,7 +148,6 @@ final class Notification
         $number  = $this->nextAttemptNumber();
         $attempt = new Attempt($number, $now);
 
-        // Indexed by integer for O(1) lookup; 1-based to match domain language.
         $this->attempts[$number->toInt()] = $attempt;
 
         $this->recordEvent(new NotificationDispatchAttempted(
@@ -188,11 +160,6 @@ final class Notification
         return $attempt;
     }
 
-    /**
-     * Records that the current in-progress attempt succeeded.
-     *
-     * Raises: NotificationDispatched
-     */
     public function recordSuccess(DateTimeImmutable $now): void
     {
         $attempt = $this->currentAttempt();
@@ -209,15 +176,6 @@ final class Notification
     }
 
     /**
-     * Records that the current in-progress attempt failed.
-     *
-     * If the failure is transient and retries remain, the notification returns
-     * to `queued` and a retry is scheduled. Otherwise it is dead-lettered.
-     *
-     * Raises: NotificationDispatchFailed
-     *         + NotificationScheduledForRetry (if retrying)
-     *         + NotificationDeadLettered (if giving up)
-     *
      * @param int $maxAttempts The ceiling enforced by the channel's retry policy.
      *                         Passed in rather than hard-coded so the policy lives
      *                         in configuration, not in the domain model.
@@ -263,18 +221,6 @@ final class Notification
         $this->deadLetter($reason, $now);
     }
 
-    /**
-     * Dead-letters the notification: the system gives up on delivery.
-     *
-     * Can also be called directly by the application layer for `processing →
-     * failed` cases (dependency vanished, etc.) — in those cases the
-     * notification transitions to `failed` rather than `dead_lettered`.
-     * Use `recordUnrecoverableFailure()` for that path.
-     *
-     * Enforces invariant 5.1.5 (at least one failed attempt before DL).
-     *
-     * Raises: NotificationDeadLettered
-     */
     private function deadLetter(string $reason, DateTimeImmutable $now): void
     {
         // Invariant 5.1.5 — dead-lettering requires at least one failed attempt.
@@ -297,29 +243,12 @@ final class Notification
         ));
     }
 
-    /**
-     * Marks the notification as permanently `failed` — the unrecoverable path
-     * where an attempt could not even be made (e.g., webhook destination deleted).
-     *
-     * Distinct from dead-lettering: `failed` means "never got to try";
-     * `dead_lettered` means "tried and gave up" (domain.md §4).
-     *
-     * Raises: NotificationDispatchFailed (classification = Unrecoverable)
-     */
     public function recordUnrecoverableFailure(string $reason, DateTimeImmutable $now): void
     {
         $this->assertNotTerminal();
 
-        // Bypass transitionTo() intentionally: the state machine encodes
-        // Processing → Failed as the normal path, but unrecoverable failure
-        // can happen before any attempt begins (e.g. destination deleted
-        // between submission and worker pickup). Dead-lettering uses the same
-        // direct assignment pattern for the same reason.
         $this->status = NotificationStatus::Failed;
 
-        // We still want a failed event in the log for observability.
-        // AttemptNumber::fromInt(count + 1) represents the attempt that would
-        // have been attempted but couldn't be started.
         $this->recordEvent(new NotificationDispatchFailed(
             notificationId: $this->id,
             attemptNumber:  AttemptNumber::fromInt(count($this->attempts) + 1),
@@ -332,15 +261,19 @@ final class Notification
 
     /**
      * Records that an operator triggered a replay of this dead-lettered
-     * notification, producing a new notification with the given id.
+     * notification, producing a new notification with the given id at
+     * the given moment.
      *
      * The original remains dead_lettered. Its DeadLetterMark gains a
-     * reference to the new notification. A new Notification aggregate
-     * is created separately (by the application layer) and will raise
-     * NotificationRequested on its own.
+     * reference to the new notification AND the replay timestamp. A new
+     * Notification aggregate is created separately (by the application
+     * layer) and will raise NotificationRequested on its own.
      *
-     * Enforces: notification must be in dead_lettered state.
-     * Raises: NotificationReplayed (on this aggregate)
+     * Day 8 update: passing `$now` to `DeadLetterMark::recordReplay`
+     * keeps the entity the single source of truth for "when was this
+     * replayed" — previously the timestamp was inferred at the
+     * persistence boundary, which was a model-truth gap (see the
+     * `DeadLetterMark` docblock).
      *
      * @see domain.md invariant 5.1.7
      */
@@ -356,7 +289,7 @@ final class Notification
             );
         }
 
-        $this->deadLetterMark?->recordReplay($replayNotificationId);
+        $this->deadLetterMark?->recordReplay($replayNotificationId, $now);
 
         $this->recordEvent(new NotificationReplayed(
             originalNotificationId: $this->id,
@@ -371,12 +304,6 @@ final class Notification
     // ---------------------------------------------------------------------------
 
     /**
-     * Returns and clears all pending domain events.
-     *
-     * The application layer calls this after persisting the aggregate and
-     * dispatches the events to whatever consumers exist (structured log,
-     * future event bus, stats aggregator).
-     *
      * @return DomainEvent[]
      */
     public function pullPendingEvents(): array
@@ -464,56 +391,11 @@ final class Notification
         return count($this->attempts);
     }
 
-    /**
-     * Whether this aggregate's request data matches a fresh submission's.
-     *
-     * Used by the application layer (`SubmitNotificationHandler`) when an
-     * `Idempotency-Key` collides with an existing notification: a match means
-     * "same logical submission" → idempotent replay; a mismatch means
-     * "different logical submission" → 409 conflict.
-     *
-     * Comparison fields are exactly those that constitute the request body
-     * (per the OpenAPI `CreateNotificationRequest` schema):
-     *   - channel, recipient, payload, priority.
-     *
-     * Out of scope on purpose:
-     *   - idempotency key (we already know it matches — that is why we are
-     *     comparing in the first place).
-     *   - api_key_id (already matched — idempotency keys are scoped per key).
-     *   - correlation id (a per-request tracing token, not part of the
-     *     logical submission).
-     *   - timestamps (the prior submission's `createdAt` differs from "now"
-     *     by definition; comparing them would always report "conflict").
-     *
-     * Why a method on the aggregate rather than a comparison utility in the
-     * handler: the *rule* for "what counts as the same submission" is a
-     * domain concern (it follows directly from invariant 5.1.8). Centralising
-     * it here means a future change to the request body shape needs to be
-     * reflected in exactly one place.
-     */
-    public function matchesSubmission(
-        Channel $channel,
-        Recipient $recipient,
-        NotificationPayload $payload,
-        Priority $priority,
-    ): bool {
-        return $this->channel === $channel
-            && $this->recipient->equals($recipient)
-            && $this->payload->equals($payload)
-            && $this->priority === $priority;
-    }
-
     // ---------------------------------------------------------------------------
     // Reconstitution — used by the repository to rebuild from persistence
     // ---------------------------------------------------------------------------
 
     /**
-     * Rebuilds a Notification from its persisted state without raising events.
-     *
-     * This is the infrastructure entry point: the repository hydrates the
-     * aggregate from the database using this method. No domain events are
-     * raised because the events already happened — they are in the log.
-     *
      * @param Attempt[] $attempts
      */
     public static function reconstitute(
@@ -531,7 +413,7 @@ final class Notification
         ?DeadLetterMark $deadLetterMark,
         ?NotificationId $replayOf,
     ): self {
-        $notification               = new self(
+        $notification                 = new self(
             id:             $id,
             channel:        $channel,
             recipient:      $recipient,
@@ -544,7 +426,7 @@ final class Notification
             correlationId:  $correlationId,
             replayOf:       $replayOf,
         );
-        $notification->attempts     = $attempts;
+        $notification->attempts       = $attempts;
         $notification->deadLetterMark = $deadLetterMark;
 
         return $notification;
@@ -559,11 +441,6 @@ final class Notification
         $this->pendingEvents[] = $event;
     }
 
-    /**
-     * Applies a status transition, enforcing the state machine.
-     * Dead-lettering is handled by deadLetter() directly because it
-     * requires additional invariant checks.
-     */
     private function transitionTo(NotificationStatus $next): void
     {
         if (!$this->status->canTransitionTo($next)) {
@@ -606,20 +483,11 @@ final class Notification
         }
     }
 
-    /**
-     * Derives the next attempt number from the existing attempts array,
-     * guaranteeing contiguity (invariant 5.1.2).
-     */
     private function nextAttemptNumber(): AttemptNumber
     {
         return AttemptNumber::fromInt(count($this->attempts) + 1);
     }
 
-    /**
-     * Returns the single attempt currently in progress.
-     * Throws if called when no attempt is in progress — this is a programming
-     * error, not a domain error.
-     */
     private function currentAttempt(): Attempt
     {
         foreach (array_reverse($this->attempts, preserve_keys: true) as $attempt) {
@@ -641,12 +509,6 @@ final class Notification
         ));
     }
 
-    /**
-     * Validates that the Recipient concrete type is consistent with the Channel
-     * (domain.md invariant 5.1.9). A recipient/channel mismatch is a caller
-     * error caught at the application boundary, but we enforce it here too so
-     * that the aggregate is self-defending regardless of how it is constructed.
-     */
     private static function assertRecipientMatchesChannel(Recipient $recipient, Channel $channel): void
     {
         $valid = match ($channel) {
