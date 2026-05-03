@@ -299,6 +299,47 @@ final class Notification
         ));
     }
 
+    /**
+     * Returns true if a fresh submission has the same business identity as
+     * this aggregate already has — same channel, same recipient, same
+     * payload, same priority. The application's idempotency check uses this
+     * to distinguish two cases that look the same from the wire:
+     *
+     *  - "the same request was retried" (return true → idempotent replay,
+     *    same notification id, no second persist or enqueue),
+     *  - "a different request happens to share the idempotency key"
+     *    (return false → 409 IdempotencyConflictException).
+     *
+     * The "same submission" rule lives here on the aggregate, not in the
+     * application service, because it is a property of what makes a
+     * notification *the same notification*. The handler's job is to react
+     * to the answer; the rule of what counts as same is a domain decision.
+     *
+     * Idempotency key is intentionally not in the comparison: the key is
+     * how the existing aggregate was found in the first place. Comparing
+     * the key against itself would always be true; including it would
+     * suggest the rule is "key + business fields match" when the rule is
+     * actually "given the same key, do the business fields match."
+     *
+     * Correlation id and api-key id are also excluded: the same submission
+     * may be retried from a different request (new correlation id), and
+     * cross-tenant idempotency is impossible anyway because the lookup
+     * already filtered by api_key_id.
+     *
+     * @see EventPulse\Application\Notification\Command\SubmitNotificationHandler
+     */
+    public function matchesSubmission(
+        Channel $channel,
+        Recipient $recipient,
+        NotificationPayload $payload,
+        Priority $priority,
+    ): bool {
+        return $this->channel === $channel
+            && $this->recipient->equals($recipient)
+            && $this->payload->equals($payload)
+            && $this->priority === $priority;
+    }
+
     // ---------------------------------------------------------------------------
     // Domain event management
     // ---------------------------------------------------------------------------

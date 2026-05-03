@@ -49,10 +49,26 @@ use Tests\Integration\Notification\Channel\Doubles\RecordingLogger;
  * raises a `LogicException`. This is the safety net that makes adding
  * a new event without updating the dispatcher impossible to ship
  * silently.
+ *
+ * Note on fixture UUIDs: `NotificationId::fromString` enforces RFC 4122
+ * v4 format (third group starts with `4`, fourth group starts with
+ * `8`/`9`/`a`/`b`). `IdempotencyKey` and `CorrelationId` are looser
+ * (printable ASCII) so they could take any string, but using the same
+ * v4 shape across all id-like fixtures keeps the test data uniform and
+ * matches what production payloads look like.
  */
 #[CoversClass(StructuredLogDomainEventDispatcher::class)]
 final class StructuredLogDomainEventDispatcherTest extends TestCase
 {
+    // Valid UUID v4 fixtures: third group starts with 4, fourth with 8/9/a/b.
+    // The earlier draft used all-1s, all-2s etc. which are valid RFC 4122
+    // strings but not v4 — that triggered the InvalidNotificationInput
+    // exception on every test in this file.
+    private const NOTIFICATION_ID = '11111111-1111-4111-8111-111111111111';
+    private const REPLAY_ID       = '33333333-3333-4333-8333-333333333333';
+    private const CORRELATION_ID  = '22222222-2222-2222-2222-222222222222';
+    private const IDEMPOTENCY_KEY = '44444444-4444-4444-4444-444444444444';
+
     private RecordingLogger $logger;
     private StructuredLogDomainEventDispatcher $dispatcher;
 
@@ -67,8 +83,8 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
         $this->logger     = new RecordingLogger();
         $this->dispatcher = new StructuredLogDomainEventDispatcher($this->logger);
 
-        $this->notificationId = NotificationId::fromString('11111111-1111-1111-1111-111111111111');
-        $this->correlationId  = CorrelationId::fromString('22222222-2222-2222-2222-222222222222');
+        $this->notificationId = NotificationId::fromString(self::NOTIFICATION_ID);
+        $this->correlationId  = CorrelationId::fromString(self::CORRELATION_ID);
         $this->occurredAt     = new DateTimeImmutable('2026-04-27T10:00:00Z');
     }
 
@@ -172,7 +188,7 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame('warning', $record['level'], 'failures retry-eligible or not surface as warnings, not errors');
-        self::assertSame('transient',         $record['context']['classification']);
+        self::assertSame('transient',          $record['context']['classification']);
         self::assertSame('connection refused', $record['context']['reason']);
         self::assertSame(1,                    $record['context']['attempt_number']);
     }
@@ -225,7 +241,7 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
     #[Test]
     public function notification_replayed_renders_at_info_with_both_ids(): void
     {
-        $replayId = NotificationId::fromString('33333333-3333-3333-3333-333333333333');
+        $replayId = NotificationId::fromString(self::REPLAY_ID);
 
         $event = new NotificationReplayed(
             originalNotificationId: $this->notificationId,
@@ -275,7 +291,7 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
             channel:        Channel::Email,
             recipient:      EmailRecipient::fromString('alice@example.test'),
             priority:       Priority::Normal,
-            idempotencyKey: IdempotencyKey::fromString('44444444-4444-4444-4444-444444444444'),
+            idempotencyKey: IdempotencyKey::fromString(self::IDEMPOTENCY_KEY),
             occurredAt:     $this->occurredAt,
             correlationId:  $this->correlationId,
         );

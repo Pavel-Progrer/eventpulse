@@ -136,10 +136,14 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
         return Notification::request(
             id:             NotificationId::generate(),
             channel:        Channel::Email,
+            // Payload uses the email shape NotificationPayload validates:
+            // a non-empty `subject` and at least one of `text` or `html`.
+            // (Earlier draft used `body`, which the validator rejects —
+            // that was the cause of three errors in the Day-8 first run.)
             recipient:      EmailRecipient::fromString('alice@example.test'),
-            rawPayload:     ['subject' => 'Hi', 'body' => 'Hello.'],
+            rawPayload:     ['subject' => 'Hi', 'text' => 'Hello.'],
             priority:       Priority::Normal,
-            idempotencyKey: IdempotencyKey::fromString('00000000-0000-0000-0000-000000000001'),
+            idempotencyKey: IdempotencyKey::fromString('idem-getdlq-test-001'),
             apiKeyId:       $apiKeyId,
             correlationId:  CorrelationId::generate(),
             now:            new DateTimeImmutable('2026-04-27T09:00:00Z'),
