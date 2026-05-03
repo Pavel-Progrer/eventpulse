@@ -9,18 +9,20 @@ use App\Http\Middleware\RequireScope;
 use EventPulse\Application\Notification\Channel\ChannelDispatcher;
 use EventPulse\Application\Notification\Channel\ChannelDriver;
 use EventPulse\Application\Notification\Channel\WebhookEndpointResolver;
+use EventPulse\Application\Notification\DeadLetter\Query\DeadLetteredNotificationsRepository;
 use EventPulse\Application\Notification\NotificationDispatchQueue;
 use EventPulse\Application\Notification\Retry\RetryPolicy;
 use EventPulse\Application\Shared\Clock;
 use EventPulse\Application\Shared\DomainEventDispatcher;
-use EventPulse\Application\Shared\NullDomainEventDispatcher;
 use EventPulse\Application\Shared\SystemClock;
 use EventPulse\Domain\Notification\Enum\Channel;
 use EventPulse\Domain\Notification\Repository\NotificationRepository;
+use EventPulse\Infrastructure\Logging\StructuredLogDomainEventDispatcher;
 use EventPulse\Infrastructure\Notification\Channel\EmailChannelDriver;
 use EventPulse\Infrastructure\Notification\Channel\SmsChannelDriver;
 use EventPulse\Infrastructure\Notification\Channel\UnconfiguredWebhookEndpointResolver;
 use EventPulse\Infrastructure\Notification\Channel\WebhookChannelDriver;
+use EventPulse\Infrastructure\Notification\Persistence\EloquentDeadLetteredNotificationsRepository;
 use EventPulse\Infrastructure\Notification\Persistence\EloquentNotificationRepository;
 use EventPulse\Infrastructure\Notification\Queue\LaravelNotificationDispatchQueue;
 use EventPulse\Infrastructure\Notification\Retry\ChannelRetryPolicy;
@@ -39,22 +41,24 @@ use Random\Randomizer;
  *
  * The container is the seam between Domain/Application interfaces and
  * their Infrastructure implementations:
- *  - `NotificationRepository`     (domain)      → `EloquentNotificationRepository`.
- *  - `Clock`                      (application) → `SystemClock`.
- *  - `DomainEventDispatcher`      (application) → `NullDomainEventDispatcher` (Day 8 swaps in the real one).
- *  - `NotificationDispatchQueue`  (application) → `LaravelNotificationDispatchQueue`.
- *  - `WebhookEndpointResolver`    (application) → `UnconfiguredWebhookEndpointResolver` (Day 9 swaps in an Eloquent-backed resolver).
- *  - `ChannelDispatcher`          (application) → constructed once with the three channel drivers.
- *  - `RetryPolicy`                (application) → `ChannelRetryPolicy` (Day 6 introduces this).
+ *  - `NotificationRepository`               (domain)      → `EloquentNotificationRepository`.
+ *  - `Clock`                                (application) → `SystemClock`.
+ *  - `DomainEventDispatcher`                (application) → `StructuredLogDomainEventDispatcher` (Day 8 swap).
+ *  - `NotificationDispatchQueue`            (application) → `LaravelNotificationDispatchQueue`.
+ *  - `WebhookEndpointResolver`              (application) → `UnconfiguredWebhookEndpointResolver` (Day 9 swap).
+ *  - `ChannelDispatcher`                    (application) → constructed once with the three channel drivers.
+ *  - `RetryPolicy`                          (application) → `ChannelRetryPolicy`.
+ *  - `DeadLetteredNotificationsRepository`  (application) → `EloquentDeadLetteredNotificationsRepository` (Day 8).
  *
- * Why register `ChannelDispatcher` as a singleton with an explicit
- * driver list rather than via Laravel's tagged-binding mechanism:
- *  Laravel tags work, but reading `tag('eventpulse.channel-drivers')` at
- *  the call site does not tell you *which* drivers will be resolved —
- *  you have to grep for `->tag()`. An explicit closure here lists all
- *  three drivers in one place, so the registration is self-documenting
- *  and the constructor's exhaustiveness check fires at the same source
- *  location it's specified.
+ * Day 8 changes:
+ *  1. `DomainEventDispatcher` switches from `NullDomainEventDispatcher`
+ *     to `StructuredLogDomainEventDispatcher`. The handler/job code is
+ *     unchanged; the change is invisible to every caller. This is what
+ *     a port-and-adapter design buys you.
+ *  2. `DeadLetteredNotificationsRepository` is added for the DLQ read
+ *     model. It binds to its Eloquent implementation that joins
+ *     `dead_letter_marks` to `notifications` and to the most recent
+ *     attempt's completed_at.
  */
 final class EventPulseServiceProvider extends ServiceProvider
 {
@@ -64,11 +68,12 @@ final class EventPulseServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     public array $bindings = [
-        Clock::class                     => SystemClock::class,
-        DomainEventDispatcher::class     => NullDomainEventDispatcher::class,
-        NotificationRepository::class    => EloquentNotificationRepository::class,
-        NotificationDispatchQueue::class => LaravelNotificationDispatchQueue::class,
-        WebhookEndpointResolver::class   => UnconfiguredWebhookEndpointResolver::class,
+        Clock::class                                 => SystemClock::class,
+        DomainEventDispatcher::class                 => StructuredLogDomainEventDispatcher::class,
+        NotificationRepository::class                => EloquentNotificationRepository::class,
+        NotificationDispatchQueue::class             => LaravelNotificationDispatchQueue::class,
+        WebhookEndpointResolver::class               => UnconfiguredWebhookEndpointResolver::class,
+        DeadLetteredNotificationsRepository::class   => EloquentDeadLetteredNotificationsRepository::class,
     ];
 
     public function register(): void
@@ -79,35 +84,13 @@ final class EventPulseServiceProvider extends ServiceProvider
 
     public function boot(Router $router): void
     {
-        // Route middleware aliases. Using string aliases keeps
-        // `routes/api.php` readable and decouples the route file from
-        // middleware class moves.
         $router->aliasMiddleware('auth.api-key', AuthenticateApiKey::class);
         $router->aliasMiddleware('scope', RequireScope::class);
     }
 
-    /**
-     * Build the `ChannelDispatcher` singleton with one driver per channel.
-     *
-     * Each driver is resolved lazily by name. Wrapping the construction
-     * in a singleton means the driver instances are constructed once
-     * per worker process — appropriate for `Mailer` and `HttpFactory`
-     * which are stateful and benefit from connection reuse.
-     *
-     * The list of drivers is kept in this single method so adding a
-     * new channel is one line here in addition to the new driver
-     * class. The dispatcher's constructor will throw at boot if any
-     * case of `Channel` is missing from this list.
-     */
     private function registerChannelDispatcher(): void
     {
         $this->app->singleton(EmailChannelDriver::class, function (Application $app): EmailChannelDriver {
-            // Strict resolution: every email dispatched by EventPulse must
-            // carry a deterministic From address. Falling back to a hard-
-            // coded "noreply@eventpulse.local" if the env is unset would
-            // hide misconfiguration in dev and silently send mail with a
-            // bogus sender in production. We'd rather fail at boot, where
-            // the operator sees the cause directly, than ship the bug.
             $config      = $app['config']->get('mail.from', []);
             $fromAddress = is_string($config['address'] ?? null) ? trim($config['address']) : '';
             $fromName    = is_string($config['name']    ?? null) ? trim($config['name'])    : '';
@@ -161,26 +144,6 @@ final class EventPulseServiceProvider extends ServiceProvider
         });
     }
 
-    /**
-     * Build the `RetryPolicy` singleton from the spec table in config.
-     *
-     * The configuration shape (see `config/eventpulse.php`) mirrors
-     * specification §5.2 one-to-one — adding a per-tenant override or a
-     * fourth channel later is a config edit, not a code edit.
-     *
-     * The `Randomizer` uses the cryptographically-secure engine
-     * (`Random\Engine\Secure`) rather than a Mersenne Twister with a
-     * derived seed. Cryptographic security is not strictly necessary
-     * for jitter, but `Secure` is the safe default — it cannot be
-     * predicted by a co-tenant who learns one retry instant, which
-     * prevents a synchronisation attack against a downstream receiver
-     * that might happen to be rate-limited by source IP. The cost
-     * difference is negligible at retry-event rates (a few per second
-     * at worst).
-     *
-     * Tests substitute a seeded `Mt19937` engine via the test container
-     * binding to make backoff assertions deterministic.
-     */
     private function registerRetryPolicy(): void
     {
         $this->app->singleton(RetryPolicy::class, function (Application $app): RetryPolicy {

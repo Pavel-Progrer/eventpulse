@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use EventPulse\Application\Notification\DeadLetter\Exception\DeadLetteredNotificationNotFoundException;
 use EventPulse\Application\Notification\Exception\IdempotencyConflictException;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationTransitionException;
@@ -60,10 +61,6 @@ final class ApiExceptionRenderer
         }
 
         if ($e instanceof RecipientChannelMismatchException) {
-            // The message on the domain exception describes which value failed
-            // (e.g. mentions VO class names). That belongs in the diagnostic,
-            // not in `error.message` — the latter is client-facing copy that
-            // UIs may show verbatim and that we want stable across versions.
             return $this->envelope(
                 code:          'VALIDATION_ERROR',
                 message:       'The recipient is not compatible with the requested channel.',
@@ -74,15 +71,6 @@ final class ApiExceptionRenderer
         }
 
         if ($e instanceof IdempotencyConflictException) {
-            // 409 specifically: the request is well-formed but conflicts with a
-            // previously stored submission under the same Idempotency-Key. The
-            // OpenAPI contract names this distinctly from a 422 because the
-            // resolution is different — the caller must compare against the
-            // original submission, not just fix a malformed field.
-            //
-            // The exception's own message string-interpolates the key value,
-            // which is already in `details.idempotency_key`. Use a stable
-            // message and let the caller read the key from where it belongs.
             return $this->envelope(
                 code:          'IDEMPOTENCY_CONFLICT',
                 message:       'The Idempotency-Key has already been used with a different request body.',
@@ -95,10 +83,6 @@ final class ApiExceptionRenderer
         }
 
         if ($e instanceof InvalidNotificationTransitionException) {
-            // The domain message names internal states ("queued → delivered"),
-            // which is engineer-facing diagnostic, not API copy. Expose the
-            // raw message under `details.reason` for debugging while keeping
-            // a stable client-facing message.
             return $this->envelope(
                 code:          'INVALID_STATE',
                 message:       'The notification cannot perform the requested operation in its current state.',
@@ -109,15 +93,32 @@ final class ApiExceptionRenderer
         }
 
         if ($e instanceof InvalidNotificationInputException) {
-            // Domain validation messages are written for engineers reading
-            // logs (they may reference VO factory names, internal field
-            // identifiers, etc.). The diagnostic moves to `details.reason`.
             return $this->envelope(
                 code:          'VALIDATION_ERROR',
                 message:       'The request data violates a notification domain rule.',
                 status:        Response::HTTP_UNPROCESSABLE_ENTITY,
                 correlationId: $correlationId,
                 details:       ['reason' => $e->getMessage()],
+            );
+        }
+
+        if ($e instanceof DeadLetteredNotificationNotFoundException) {
+            // 404 for three failure modes: the id doesn't exist, the
+            // notification is in another tenant's scope, or the notification
+            // is in a non-DLQ status. Returning the same code for all three
+            // is a deliberate information-disclosure choice — see the
+            // exception's own docblock and ADR-0006 §"DLQ visibility is
+            // tenant-scoped".
+            //
+            // The diagnostic message stays in `details.reason` for log
+            // archaeology; the client-facing message is intentionally
+            // generic.
+            return $this->envelope(
+                code:          'NOT_FOUND',
+                message:       'No dead-lettered notification with that id is visible.',
+                status:        Response::HTTP_NOT_FOUND,
+                correlationId: $correlationId,
+                details:       null,
             );
         }
 
