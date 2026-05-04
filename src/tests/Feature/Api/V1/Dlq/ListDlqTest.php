@@ -7,6 +7,7 @@ namespace Tests\Feature\Api\V1\Dlq;
 use App\Models\ApiKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -31,6 +32,18 @@ use Tests\TestCase;
  *    pagination shape, and the tenant scoping.
  *  - The `EloquentNotificationRepository` test (separately) covers the
  *    write path that produces these rows.
+ *
+ * Two seeding details that bit me on the first run:
+ *  1. `notifications.id` is a UUID column — string labels like
+ *     "row-1" fail at insert with a Postgres `22P02` error. The seed
+ *     now generates real UUIDs and returns them so tests can assert
+ *     against them.
+ *  2. The persisted `payload` column carries the *domain* shape
+ *     (`text`/`html`), not the wire shape (`body_text`/`body_html`).
+ *     The wire-to-domain mapping happens in the controller's
+ *     `mapPayloadForDomain`. Seeding directly into the table means
+ *     using the domain shape, otherwise reconstitute fails on
+ *     `NotificationPayload::validateEmail`.
  */
 final class ListDlqTest extends TestCase
 {
@@ -73,9 +86,13 @@ final class ListDlqTest extends TestCase
     #[Test]
     public function returns_401_without_a_bearer_token(): void
     {
+        // The middleware emits the code `UNAUTHORIZED` (matches the project's
+        // existing convention in AuthenticateApiKey, regardless of HTTP-status
+        // semantics around 401 vs 403). We assert on what the middleware
+        // actually emits, not on RFC vocabulary.
         $this->getJson('/api/v1/dlq')
             ->assertStatus(401)
-            ->assertJsonPath('error.code', 'UNAUTHENTICATED');
+            ->assertJsonPath('error.code', 'UNAUTHORIZED');
     }
 
     #[Test]
@@ -108,15 +125,15 @@ final class ListDlqTest extends TestCase
     #[Test]
     public function returns_only_rows_belonging_to_the_calling_api_key(): void
     {
-        $this->seedDlqEntry($this->reader,      'reader-row',  '2026-04-27T10:00:00Z');
-        $this->seedDlqEntry($this->otherTenant, 'other-row',   '2026-04-27T10:01:00Z');
+        $readerRowId = $this->seedDlqEntry($this->reader,      '2026-04-27T10:00:00Z');
+        $this->seedDlqEntry($this->otherTenant, '2026-04-27T10:01:00Z');
 
         $response = $this->getJson('/api/v1/dlq', $this->headersFor($this->reader))
             ->assertOk();
 
         $rows = $response->json('data');
         self::assertCount(1, $rows);
-        self::assertSame('reader-row', $rows[0]['notification_id']);
+        self::assertSame($readerRowId, $rows[0]['notification_id']);
     }
 
     // -----------------------------------------------------------------------
@@ -126,8 +143,8 @@ final class ListDlqTest extends TestCase
     #[Test]
     public function returns_rows_most_recent_first_with_the_documented_shape(): void
     {
-        $this->seedDlqEntry($this->reader, 'older-row',  '2026-04-27T09:00:00Z', reason: 'unrecoverable_error');
-        $this->seedDlqEntry($this->reader, 'newer-row',  '2026-04-27T10:00:00Z', reason: 'max_retries_exceeded');
+        $olderId = $this->seedDlqEntry($this->reader, '2026-04-27T09:00:00Z', reason: 'unrecoverable_error');
+        $newerId = $this->seedDlqEntry($this->reader, '2026-04-27T10:00:00Z', reason: 'max_retries_exceeded');
 
         $response = $this->getJson('/api/v1/dlq', $this->headersFor($this->reader))
             ->assertOk();
@@ -135,8 +152,8 @@ final class ListDlqTest extends TestCase
         $rows = $response->json('data');
         self::assertCount(2, $rows);
 
-        self::assertSame('newer-row', $rows[0]['notification_id']);
-        self::assertSame('older-row', $rows[1]['notification_id']);
+        self::assertSame($newerId, $rows[0]['notification_id']);
+        self::assertSame($olderId, $rows[1]['notification_id']);
 
         // Shape per OpenAPI DlqEntry — every documented key present.
         foreach (['id', 'notification_id', 'reason', 'channel', 'created_at',
@@ -152,8 +169,8 @@ final class ListDlqTest extends TestCase
     #[Test]
     public function filters_by_reason(): void
     {
-        $this->seedDlqEntry($this->reader, 'a', '2026-04-27T10:00:00Z', reason: 'max_retries_exceeded');
-        $this->seedDlqEntry($this->reader, 'b', '2026-04-27T10:01:00Z', reason: 'unrecoverable_error');
+        $this->seedDlqEntry($this->reader, '2026-04-27T10:00:00Z', reason: 'max_retries_exceeded');
+        $unrecoverableId = $this->seedDlqEntry($this->reader, '2026-04-27T10:01:00Z', reason: 'unrecoverable_error');
 
         $response = $this->getJson(
             '/api/v1/dlq?reason=unrecoverable_error',
@@ -162,15 +179,15 @@ final class ListDlqTest extends TestCase
 
         $rows = $response->json('data');
         self::assertCount(1, $rows);
-        self::assertSame('b', $rows[0]['notification_id']);
+        self::assertSame($unrecoverableId, $rows[0]['notification_id']);
     }
 
     #[Test]
     public function filters_by_channel(): void
     {
-        $this->seedDlqEntry($this->reader, 'a', '2026-04-27T10:00:00Z', channel: 'email');
-        $this->seedDlqEntry($this->reader, 'b', '2026-04-27T10:01:00Z', channel: 'sms');
-        $this->seedDlqEntry($this->reader, 'c', '2026-04-27T10:02:00Z', channel: 'webhook');
+        $this->seedDlqEntry($this->reader, '2026-04-27T10:00:00Z', channel: 'email');
+        $smsId = $this->seedDlqEntry($this->reader, '2026-04-27T10:01:00Z', channel: 'sms');
+        $this->seedDlqEntry($this->reader, '2026-04-27T10:02:00Z', channel: 'webhook');
 
         $response = $this->getJson(
             '/api/v1/dlq?channel=sms',
@@ -179,15 +196,15 @@ final class ListDlqTest extends TestCase
 
         $rows = $response->json('data');
         self::assertCount(1, $rows);
-        self::assertSame('b', $rows[0]['notification_id']);
+        self::assertSame($smsId, $rows[0]['notification_id']);
     }
 
     #[Test]
     public function filters_by_date_range(): void
     {
-        $this->seedDlqEntry($this->reader, 'before', '2026-04-26T23:00:00Z');
-        $this->seedDlqEntry($this->reader, 'within', '2026-04-27T10:00:00Z');
-        $this->seedDlqEntry($this->reader, 'after',  '2026-04-28T01:00:00Z');
+        $this->seedDlqEntry($this->reader, '2026-04-26T23:00:00Z'); // before window
+        $withinId = $this->seedDlqEntry($this->reader, '2026-04-27T10:00:00Z'); // within window
+        $this->seedDlqEntry($this->reader, '2026-04-28T01:00:00Z'); // after window
 
         $response = $this->getJson(
             '/api/v1/dlq?created_after=2026-04-27T00:00:00Z&created_before=2026-04-28T00:00:00Z',
@@ -196,7 +213,7 @@ final class ListDlqTest extends TestCase
 
         $rows = $response->json('data');
         self::assertCount(1, $rows);
-        self::assertSame('within', $rows[0]['notification_id']);
+        self::assertSame($withinId, $rows[0]['notification_id']);
     }
 
     #[Test]
@@ -220,10 +237,10 @@ final class ListDlqTest extends TestCase
     #[Test]
     public function paginates_with_a_cursor(): void
     {
+        $ids = [];
         for ($i = 1; $i <= 5; $i++) {
-            $this->seedDlqEntry(
+            $ids[] = $this->seedDlqEntry(
                 $this->reader,
-                "row-$i",
                 sprintf('2026-04-27T10:%02d:00Z', $i),
             );
         }
@@ -258,10 +275,17 @@ final class ListDlqTest extends TestCase
         self::assertCount(1, $thirdIds);
         self::assertNull($third->json('pagination.next_cursor'));
 
+        // Same set of ids appears across the three pages — no duplicates,
+        // no skips.
         self::assertCount(
             5,
             array_unique(array_merge($firstIds, $secondIds, $thirdIds)),
             'paginated ids must not repeat across pages',
+        );
+        self::assertEqualsCanonicalizing(
+            $ids,
+            array_merge($firstIds, $secondIds, $thirdIds),
+            'every seeded id appears in some page',
         );
     }
 
@@ -269,24 +293,32 @@ final class ListDlqTest extends TestCase
     // Test seam: insert a notifications row + a dead_letter_marks row.
     // The full aggregate write path is covered separately; here we
     // need rows that the read query joins against, no more.
+    //
+    // Returns the generated notification UUID so the caller can assert
+    // against it (the column type rejects bare labels).
     // -----------------------------------------------------------------------
 
     private function seedDlqEntry(
         ApiKey $apiKey,
-        string $notificationId,
         string $deadLetteredAt,
         string $reason = 'max_retries_exceeded',
         string $channel = 'email',
-    ): void {
-        // notifications row in dead_lettered status. Any payload shape
-        // valid for `email` is fine — this query never reads it.
+    ): string {
+        $notificationId = (string) Str::uuid();
+        $dlmId          = (string) Str::uuid();
+
+        // notifications row in dead_lettered status. Payload uses the
+        // *domain* shape (`text`, not `body_text`) because that's what
+        // the persistence layer stores after the controller's wire→domain
+        // mapping. Reconstitute validates the payload, so a wrong shape
+        // here would 500 the inspect endpoint.
         DB::table('notifications')->insert([
             'id'              => $notificationId,
             'api_key_id'      => $apiKey->id,
             'channel'         => $channel,
-            'recipient'       => 'recipient@example.test',
+            'recipient'       => $this->recipientFor($channel),
             'priority'        => 'normal',
-            'payload'         => json_encode(['subject' => 's', 'body_text' => 'b']),
+            'payload'         => json_encode($this->payloadFor($channel)),
             'status'          => 'dead_lettered',
             'correlation_id'  => 'corr-' . $notificationId,
             'idempotency_key' => 'idem-' . $notificationId,
@@ -296,7 +328,7 @@ final class ListDlqTest extends TestCase
         ]);
 
         DB::table('dead_letter_marks')->insert([
-            'id'                     => 'dlm-' . $notificationId,
+            'id'                     => $dlmId,
             'notification_id'        => $notificationId,
             'reason'                 => $reason,
             'dead_lettered_at'       => $deadLetteredAt,
@@ -305,6 +337,36 @@ final class ListDlqTest extends TestCase
             'created_at'             => $deadLetteredAt,
             'updated_at'             => $deadLetteredAt,
         ]);
+
+        return $notificationId;
+    }
+
+    /**
+     * Domain-shape payload per channel — what persistence stores after
+     * the controller's wire→domain mapping. Matches what
+     * `NotificationPayload::validate*` expects.
+     *
+     * @return array<string, mixed>
+     */
+    private function payloadFor(string $channel): array
+    {
+        return match ($channel) {
+            'email'   => ['subject' => 'Subject line', 'text' => 'Body text.'],
+            'sms'     => ['body' => 'A short text.'],
+            'webhook' => ['event' => 'demo.event', 'data' => ['k' => 'v']],
+            default   => throw new \LogicException("Unknown channel: $channel"),
+        };
+    }
+
+    private function recipientFor(string $channel): string
+    {
+        return match ($channel) {
+            'email'   => 'recipient@example.test',
+            'sms'     => '+15555550100',
+            // Webhook recipients are destination-id strings (uuid form).
+            'webhook' => (string) Str::uuid(),
+            default   => throw new \LogicException("Unknown channel: $channel"),
+        };
     }
 
     /**

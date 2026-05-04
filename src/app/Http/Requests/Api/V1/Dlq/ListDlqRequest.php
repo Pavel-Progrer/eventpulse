@@ -25,6 +25,25 @@ use Illuminate\Foundation\Http\FormRequest;
 final class ListDlqRequest extends FormRequest
 {
     /**
+     * Authentication and scope-checking happen in middleware
+     * (`auth.api-key` + `scope:dlq:read`); by the time this FormRequest
+     * runs, the caller is already authorised to use the endpoint.
+     *
+     * Returning `true` here is required: in this project's Laravel
+     * setup the default `authorize()` is `false`, so omitting this
+     * method causes every request to fail authorization before
+     * `rules()` runs — surfacing as a 500 in tests because the
+     * resulting AuthorizationException isn't on the API renderer's
+     * mapping list.
+     *
+     * Same shape as `SubmitNotificationRequest::authorize()`.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array

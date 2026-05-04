@@ -24,6 +24,14 @@ use Tests\TestCase;
  *
  * The same 404 for the last three cases is the deliberate
  * information-disclosure choice recorded in ADR-0006.
+ *
+ * Seeding note: the `payload` column carries the *domain* shape
+ * (`text`/`html`), not the wire shape (`body_text`/`body_html`) the
+ * OpenAPI spec uses. The wire-to-domain mapping happens in
+ * `SubmitNotificationController::mapPayloadForDomain`. Seeding directly
+ * into the table means using the domain shape, otherwise reconstitute
+ * fails on `NotificationPayload::validateEmail` and the endpoint 500s
+ * before the handler's tenant/status checks ever run.
  */
 final class GetDlqTest extends TestCase
 {
@@ -162,15 +170,17 @@ final class GetDlqTest extends TestCase
     public function returns_404_for_a_notification_that_is_not_dead_lettered(): void
     {
         $id = Str::uuid()->toString();
-        // Insert just the notifications row in `queued` status — no
-        // dead_letter_marks row. The handler must refuse this id.
+        // Insert a notifications row in `queued` status, no dead_letter_marks
+        // row. The handler must refuse this id even though it exists.
+        // Domain-shape payload (`text`, not `body_text`) so hydrate succeeds —
+        // the handler's job is to reject the row, not the persistence layer's.
         DB::table('notifications')->insert([
             'id'              => $id,
             'api_key_id'      => $this->reader->id,
             'channel'         => 'email',
             'recipient'       => 'someone@example.test',
             'priority'        => 'normal',
-            'payload'         => json_encode(['subject' => 's', 'body_text' => 'b']),
+            'payload'         => json_encode(['subject' => 'Hi', 'text' => 'Body.']),
             'status'          => 'queued',
             'correlation_id'  => 'corr-' . $id,
             'idempotency_key' => 'idem-' . $id,
@@ -215,7 +225,8 @@ final class GetDlqTest extends TestCase
             'channel'         => 'email',
             'recipient'       => 'someone@example.test',
             'priority'        => 'normal',
-            'payload'         => json_encode(['subject' => 's', 'body_text' => 'b']),
+            // Domain shape — see class docblock.
+            'payload'         => json_encode(['subject' => 'Hi', 'text' => 'Body.']),
             'status'          => 'dead_lettered',
             'correlation_id'  => 'corr-' . $notificationId,
             'idempotency_key' => 'idem-' . $notificationId,

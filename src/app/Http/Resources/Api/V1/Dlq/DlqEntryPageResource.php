@@ -24,6 +24,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *    pagination's contract is "give me the next batch," not "tell me
  *    how big this is."
  *
+ * Implementation note (from a Day-8 bug): the previous version used
+ * `DlqEntryResource::collection($page->entries)` to render the inner
+ * `data` array. That produces an `AnonymousResourceCollection` which,
+ * when embedded inside this resource's `toArray()` return value,
+ * doesn't get auto-resolved the way it does at the top level. The
+ * symptom was a 500 on every list call. The fix is to map explicitly
+ * — call each item's resource through `toArray()` ourselves, so
+ * `data` is a plain array of plain arrays by the time the JSON
+ * encoder runs.
+ *
  * @property-read DlqEntryPage $resource
  */
 final class DlqEntryPageResource extends JsonResource
@@ -38,7 +48,10 @@ final class DlqEntryPageResource extends JsonResource
         $page = $this->resource;
 
         return [
-            'data'       => DlqEntryResource::collection($page->entries),
+            'data'       => array_map(
+                static fn ($entry) => DlqEntryResource::make($entry)->toArray($request),
+                $page->entries,
+            ),
             'pagination' => [
                 'next_cursor' => $page->nextCursor,
             ],
