@@ -45,39 +45,9 @@ use Tests\TestCase;
  *     using the domain shape, otherwise reconstitute fails on
  *     `NotificationPayload::validateEmail`.
  */
-final class ListDlqTest extends TestCase
+final class ListDlqTest extends DlqFeatureTestCase
 {
     use RefreshDatabase;
-
-    private ApiKey $reader;        // dlq:read
-    private ApiKey $otherTenant;   // dlq:read but different api key
-    private ApiKey $writeOnly;     // notifications:write only — must 403
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->reader = ApiKey::query()->create([
-            'identifier' => 'ep_live_dlq_reader_001',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader A',
-        ]);
-
-        $this->otherTenant = ApiKey::query()->create([
-            'identifier' => 'ep_live_dlq_reader_002',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader B',
-        ]);
-
-        $this->writeOnly = ApiKey::query()->create([
-            'identifier' => 'ep_live_writer_only_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'writer with no DLQ access',
-        ]);
-    }
 
     // -----------------------------------------------------------------------
     // Auth and authorisation

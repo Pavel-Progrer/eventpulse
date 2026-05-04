@@ -33,39 +33,9 @@ use Tests\TestCase;
  * fails on `NotificationPayload::validateEmail` and the endpoint 500s
  * before the handler's tenant/status checks ever run.
  */
-final class GetDlqTest extends TestCase
+final class GetDlqTest extends DlqFeatureTestCase
 {
     use RefreshDatabase;
-
-    private ApiKey $reader;
-    private ApiKey $otherTenant;
-    private ApiKey $writeOnly;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->reader = ApiKey::query()->create([
-            'identifier' => 'ep_live_dlq_reader_001',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader A',
-        ]);
-
-        $this->otherTenant = ApiKey::query()->create([
-            'identifier' => 'ep_live_dlq_reader_002',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader B',
-        ]);
-
-        $this->writeOnly = ApiKey::query()->create([
-            'identifier' => 'ep_live_writer_only_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'writer with no DLQ access',
-        ]);
-    }
 
     // -----------------------------------------------------------------------
     // Auth and authorisation
