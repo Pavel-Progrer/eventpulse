@@ -420,6 +420,39 @@ final class Notification
     }
 
     /**
+ * Latest `completedAt` across this notification's attempts, or `null`
+ * if no attempt has completed (every attempt is in-progress, or the
+ * notification has no attempts at all).
+ *
+ * Lives on the aggregate because it is a property of the notification's
+ * own history. The DLQ list endpoint computes the same value via a
+ * `MAX(attempts.completed_at)` SQL sub-select for efficiency at scale;
+ * the two implementations express the same definition in different
+ * layers and must stay aligned. If the definition ever changes (e.g.
+ * "latest *failed* attempt" vs "latest of any kind"), update both.
+ *
+ * @see EloquentDeadLetteredNotificationsRepository::list  for the SQL twin.
+ */
+public function finalAttemptAt(): ?DateTimeImmutable
+{
+    $latest = null;
+
+    foreach ($this->attempts as $attempt) {
+        $completed = $attempt->completedAt();
+
+        if ($completed === null) {
+            continue;
+        }
+
+        if ($latest === null || $completed > $latest) {
+            $latest = $completed;
+        }
+    }
+
+    return $latest;
+}
+
+    /**
      * @return Attempt[]
      */
     public function attempts(): array

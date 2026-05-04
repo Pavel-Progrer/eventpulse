@@ -61,7 +61,15 @@ final class DlqEntryDetailedResource extends JsonResource
             'notification_id'        => $notification->id()->toString(),
             'reason'                 => $mark->reason(),
             'channel'                => $notification->channel()->value,
-            'final_attempt_at'       => $this->finalAttemptAt($notification)?->format(\DateTimeInterface::ATOM),
+
+            // `final_attempt_at` is the aggregate's own answer to "when
+            // did the last completed attempt finish." The list endpoint
+            // computes the equivalent value in SQL via a sub-select; the
+            // two implementations express the same definition in
+            // different layers (see Notification::finalAttemptAt for the
+            // contract).
+            'final_attempt_at'       => $notification->finalAttemptAt()?->format(\DateTimeInterface::ATOM),
+
             'replayed_at'            => $mark->replayedAt()?->format(\DateTimeInterface::ATOM),
             'replay_notification_id' => $mark->replayNotificationId()?->toString(),
             'created_at'             => $mark->deadLetteredAt()->format(\DateTimeInterface::ATOM),
@@ -120,24 +128,5 @@ final class DlqEntryDetailedResource extends JsonResource
             'classification' => $attempt->failureClassification()?->value,
             'reason'         => $attempt->failureReason(),
         ];
-    }
-
-    private function finalAttemptAt(Notification $notification): ?\DateTimeImmutable
-    {
-        $latest = null;
-
-        foreach ($notification->attempts() as $attempt) {
-            $completed = $attempt->completedAt();
-
-            if ($completed === null) {
-                continue;
-            }
-
-            if ($latest === null || $completed > $latest) {
-                $latest = $completed;
-            }
-        }
-
-        return $latest;
     }
 }

@@ -48,15 +48,10 @@ final class GetDeadLetteredQueryHandler
         // The same exception covers three failure modes — see class docblock
         // and the exception's own docblock for why information disclosure
         // motivates that.
-        if ($notification === null) {
-            throw new DeadLetteredNotificationNotFoundException($query->notificationId);
-        }
-
-        if ($notification->apiKeyId() !== $query->apiKeyId) {
-            throw new DeadLetteredNotificationNotFoundException($query->notificationId);
-        }
-
-        if ($notification->status() !== NotificationStatus::DeadLettered) {
+        if ($notification === null
+            || $notification->apiKeyId() !== $query->apiKeyId
+            || $notification->status() !== NotificationStatus::DeadLettered
+        ) {
             throw new DeadLetteredNotificationNotFoundException($query->notificationId);
         }
 

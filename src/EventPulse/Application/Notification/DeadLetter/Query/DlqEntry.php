@@ -28,15 +28,25 @@ use EventPulse\Domain\Notification\Enum\Channel;
  *    Eloquent rows and the HTTP layer's API resource.
  *
  * The single-inspection endpoint (`GET /api/v1/dlq/{id}`) loads the
- * full aggregate via `NotificationRepository::findById()`. That endpoint
- * exposes attempts and full payload, so it earns the cost of full
- * hydration.
+ * full aggregate via `NotificationRepository::findById()`. That
+ * endpoint exposes attempts and full payload, so it earns the cost of
+ * full hydration — and the equivalent of `finalAttemptAt` is computed
+ * by `Notification::finalAttemptAt()` directly off the loaded
+ * collection (no extra DB round-trip).
  *
  * Not a Domain value object — DLQ entries are a read-model concept
  * coming from a *projection* over multiple aggregates and tables. They
  * have no invariants of their own; the entity's invariants live on the
  * `DeadLetterMark` and `Notification` aggregates, which produced this
  * row.
+ *
+ * On `finalAttemptAt`: the canonical definition lives on the
+ * `Notification` aggregate (`Notification::finalAttemptAt()`); the SQL
+ * sub-select in `EloquentDeadLetteredNotificationsRepository::list`
+ * produces the same value over the persisted attempts table for
+ * efficiency at scale. The two implementations express the same
+ * "max of attempts.completed_at, or null" definition; if the
+ * definition ever changes, both must move together.
  */
 final readonly class DlqEntry
 {
@@ -46,7 +56,7 @@ final readonly class DlqEntry
         public string $reason,
         public Channel $channel,
         public DateTimeImmutable $deadLetteredAt,
-        public ?DateTimeImmutable $finalAttemptAt,  // last attempt's completed_at (null only if a state-machine bug let dead-lettering happen pre-attempt)
+        public ?DateTimeImmutable $finalAttemptAt,  // see class docblock — same definition as Notification::finalAttemptAt
         public ?string $replayNotificationId,
         public ?DateTimeImmutable $replayedAt,
     ) {}

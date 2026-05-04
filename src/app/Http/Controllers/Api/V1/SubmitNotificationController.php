@@ -49,7 +49,7 @@ final class SubmitNotificationController
             ),
             priority:       Priority::from($request->validated('priority', 'normal')),
             idempotencyKey: (string) $request->header('Idempotency-Key'),
-            apiKeyId:       (string) $apiKey->id,
+            apiKeyId:       $apiKey->id,
             correlationId:  $request->header('X-Correlation-ID'),
         );
 

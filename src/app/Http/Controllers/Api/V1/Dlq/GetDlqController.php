@@ -41,7 +41,7 @@ final class GetDlqController
 
         $query = new GetDeadLetteredQuery(
             notificationId: $id,
-            apiKeyId:       (string) $apiKey->id,
+            apiKeyId:       $apiKey->id,
         );
 
         $notification = ($this->handler)($query);
