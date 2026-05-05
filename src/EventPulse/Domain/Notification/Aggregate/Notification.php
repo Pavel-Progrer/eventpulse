@@ -68,6 +68,18 @@ final class Notification
     /** @var DomainEvent[] Pending events, released by the application layer. */
     private array $pendingEvents = [];
 
+    /**
+     * DLQ category emitted when a retry-eligible failure exhausts the
+     * configured `maxAttempts`. Distinct from the per-attempt failure
+     * string (`'connection refused'`, etc.), which is preserved on the
+     * `Attempt` entity. Pinned by the OpenAPI `DlqReason` enum and the
+     * `dead_letter_marks.reason` column's expected values.
+     */
+    private const DLQ_REASON_MAX_RETRIES_EXCEEDED = 'max_retries_exceeded';
+
+    /** DLQ category emitted when a non-retry-eligible failure occurs. */
+    private const DLQ_REASON_UNRECOVERABLE_ERROR = 'unrecoverable_error';
+
     // ---------------------------------------------------------------------------
     // Construction — factory only, no public constructor
     // ---------------------------------------------------------------------------
@@ -217,10 +229,27 @@ final class Notification
             return;
         }
 
-        // No retries — dead-letter.
-        $this->deadLetter($reason, $now);
+        // No retries. Two distinct paths land here:
+        //   - the failure is non-retry-eligible (unrecoverable),
+        //   - the failure is retry-eligible but the attempt budget
+        //     is exhausted.
+        // The DLQ category recorded on the mark distinguishes the two,
+        // because the API exposes them as filter values. The
+        // per-attempt failure string is preserved on the `Attempt`
+        // entity and on the dispatch-failed event.
+        $dlqReason = $classification->isRetryEligible()
+            ? self::DLQ_REASON_MAX_RETRIES_EXCEEDED
+            : self::DLQ_REASON_UNRECOVERABLE_ERROR;
+
+        $this->deadLetter($dlqReason, $now);
     }
 
+    /**
+     * @param string $reason The DLQ category — one of the
+     *                       `DLQ_REASON_*` class constants. NOT the
+     *                       free-form per-attempt failure string;
+     *                       that lives on the `Attempt` entity.
+     */
     private function deadLetter(string $reason, DateTimeImmutable $now): void
     {
         // Invariant 5.1.5 — dead-lettering requires at least one failed attempt.

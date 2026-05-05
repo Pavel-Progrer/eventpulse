@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\Factories\UsesNotificationFactory;
 use Tests\TestCase;
 
 /**
@@ -25,17 +26,45 @@ use Tests\TestCase;
  * The same 404 for the last three cases is the deliberate
  * information-disclosure choice recorded in ADR-0006.
  *
- * Seeding note: the `payload` column carries the *domain* shape
- * (`text`/`html`), not the wire shape (`body_text`/`body_html`) the
- * OpenAPI spec uses. The wire-to-domain mapping happens in
- * `SubmitNotificationController::mapPayloadForDomain`. Seeding directly
- * into the table means using the domain shape, otherwise reconstitute
- * fails on `NotificationPayload::validateEmail` and the endpoint 500s
- * before the handler's tenant/status checks ever run.
+ * Fixtures are built through `NotificationFactory` for the dead-lettered
+ * cases. The "not dead-lettered" case still uses a direct insert because
+ * the factory deliberately doesn't build queued notifications — that's
+ * future work when the status endpoint ships.
  */
-final class GetDlqTest extends DlqFeatureTestCase
+final class GetDlqTest extends TestCase
 {
     use RefreshDatabase;
+    use UsesNotificationFactory;
+
+    private ApiKey $reader;
+    private ApiKey $otherTenant;
+    private ApiKey $writeOnly;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->reader = ApiKey::query()->create([
+            'identifier' => 'ep_live_dlq_reader_001',
+            'scopes'     => ['dlq:read'],
+            'status'     => 'active',
+            'label'      => 'reader A',
+        ]);
+
+        $this->otherTenant = ApiKey::query()->create([
+            'identifier' => 'ep_live_dlq_reader_002',
+            'scopes'     => ['dlq:read'],
+            'status'     => 'active',
+            'label'      => 'reader B',
+        ]);
+
+        $this->writeOnly = ApiKey::query()->create([
+            'identifier' => 'ep_live_writer_only_001',
+            'scopes'     => ['notifications:write'],
+            'status'     => 'active',
+            'label'      => 'writer with no DLQ access',
+        ]);
+    }
 
     // -----------------------------------------------------------------------
     // Auth and authorisation
@@ -64,18 +93,19 @@ final class GetDlqTest extends DlqFeatureTestCase
     #[Test]
     public function returns_the_full_dead_lettered_notification(): void
     {
-        $id = Str::uuid()->toString();
-        $this->seedDeadLetteredNotificationWithAttempts(
-            apiKey:         $this->reader,
-            notificationId: $id,
-            deadLetteredAt: '2026-04-27T10:00:00Z',
-            attempts:       [
-                ['number' => 1, 'started_at' => '2026-04-27T09:50:00Z', 'completed_at' => '2026-04-27T09:50:05Z',
-                 'succeeded' => false, 'classification' => 'transient', 'reason' => 'connection refused'],
-                ['number' => 2, 'started_at' => '2026-04-27T09:55:00Z', 'completed_at' => '2026-04-27T09:55:05Z',
-                 'succeeded' => false, 'classification' => 'permanent', 'reason' => 'destination rejected'],
-            ],
-        );
+        // Two attempts — one preceding retry, one final dead-lettering
+        // failure. Both transient (the factory's transient-retry path
+        // for `max_retries_exceeded`); the test asserts on attempt
+        // count and the rendering shape, not on a specific classification
+        // mix.
+        $notification = $this->factory()
+            ->dlqEntry($this->reader)
+            ->withReason('max_retries_exceeded')
+            ->withPrecedingRetries(1)
+            ->deadLetteredAt('2026-04-27T10:00:00Z')
+            ->save();
+
+        $id = $notification->id()->toString();
 
         $response = $this->getJson(
             "/api/v1/dlq/{$id}",
@@ -95,15 +125,23 @@ final class GetDlqTest extends DlqFeatureTestCase
         $response->assertJsonPath('notification.status', 'dead_lettered');
         $response->assertJsonPath('notification.channel', 'email');
 
-        // Attempts present in order.
+        // Attempts present in order — two of them, the second one
+        // failing at the deadLetteredAt instant.
         $response->assertJsonCount(2, 'notification.attempts');
-        $response->assertJsonPath('notification.attempts.0.number',         1);
-        $response->assertJsonPath('notification.attempts.0.classification', 'transient');
-        $response->assertJsonPath('notification.attempts.1.number',         2);
-        $response->assertJsonPath('notification.attempts.1.classification', 'permanent');
+        $response->assertJsonPath('notification.attempts.0.number', 1);
+        $response->assertJsonPath('notification.attempts.1.number', 2);
 
-        // final_attempt_at is the latest attempt's completed_at.
-        $response->assertJsonPath('final_attempt_at', '2026-04-27T09:55:05+00:00');
+        // Both attempts are failed (succeeded=false) — the final one is
+        // what dead-lettered the notification, the preceding one was a
+        // transient failure that scheduled a retry.
+        $response->assertJsonPath('notification.attempts.0.succeeded', false);
+        $response->assertJsonPath('notification.attempts.1.succeeded', false);
+        $response->assertJsonPath('notification.attempts.0.classification', 'transient');
+        $response->assertJsonPath('notification.attempts.1.classification', 'transient');
+
+        // final_attempt_at is the latest attempt's completed_at —
+        // matches the dead-lettered-at instant the factory was given.
+        $response->assertJsonPath('final_attempt_at', '2026-04-27T10:00:00+00:00');
     }
 
     // -----------------------------------------------------------------------
@@ -124,14 +162,15 @@ final class GetDlqTest extends DlqFeatureTestCase
     #[Test]
     public function returns_404_for_a_cross_tenant_id(): void
     {
-        $id = Str::uuid()->toString();
-        $this->seedDeadLetteredNotificationWithAttempts(
-            apiKey:         $this->otherTenant,
-            notificationId: $id,
-            deadLetteredAt: '2026-04-27T10:00:00Z',
-        );
+        $crossTenant = $this->factory()
+            ->dlqEntry($this->otherTenant)
+            ->deadLetteredAt('2026-04-27T10:00:00Z')
+            ->save();
 
-        $this->getJson("/api/v1/dlq/{$id}", $this->headersFor($this->reader))
+        $this->getJson(
+            "/api/v1/dlq/{$crossTenant->id()->toString()}",
+            $this->headersFor($this->reader),
+        )
             ->assertStatus(404)
             ->assertJsonPath('error.code', 'NOT_FOUND');
     }
@@ -139,11 +178,11 @@ final class GetDlqTest extends DlqFeatureTestCase
     #[Test]
     public function returns_404_for_a_notification_that_is_not_dead_lettered(): void
     {
+        // The factory deliberately doesn't build queued notifications —
+        // that's the status endpoint's territory, future work. For this
+        // one case we insert directly: a queued notification belonging to
+        // the caller, no dead-letter mark. The handler must refuse it.
         $id = Str::uuid()->toString();
-        // Insert a notifications row in `queued` status, no dead_letter_marks
-        // row. The handler must refuse this id even though it exists.
-        // Domain-shape payload (`text`, not `body_text`) so hydrate succeeds —
-        // the handler's job is to reject the row, not the persistence layer's.
         DB::table('notifications')->insert([
             'id'              => $id,
             'api_key_id'      => $this->reader->id,
@@ -174,62 +213,6 @@ final class GetDlqTest extends DlqFeatureTestCase
         $this->getJson('/api/v1/dlq/not-a-uuid', $this->headersFor($this->reader))
             ->assertStatus(422)
             ->assertJsonPath('error.code', 'VALIDATION_ERROR');
-    }
-
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-
-    /**
-     * @param array<int, array<string, mixed>> $attempts
-     */
-    private function seedDeadLetteredNotificationWithAttempts(
-        ApiKey $apiKey,
-        string $notificationId,
-        string $deadLetteredAt,
-        array $attempts = [],
-    ): void {
-        DB::table('notifications')->insert([
-            'id'              => $notificationId,
-            'api_key_id'      => $apiKey->id,
-            'channel'         => 'email',
-            'recipient'       => 'someone@example.test',
-            'priority'        => 'normal',
-            // Domain shape — see class docblock.
-            'payload'         => json_encode(['subject' => 'Hi', 'text' => 'Body.']),
-            'status'          => 'dead_lettered',
-            'correlation_id'  => 'corr-' . $notificationId,
-            'idempotency_key' => 'idem-' . $notificationId,
-            'replay_of_id'    => null,
-            'created_at'      => $deadLetteredAt,
-            'updated_at'      => $deadLetteredAt,
-        ]);
-
-        DB::table('dead_letter_marks')->insert([
-            'id'                     => $notificationId, // alignment with the controller's id-equals-id projection
-            'notification_id'        => $notificationId,
-            'reason'                 => 'max_retries_exceeded',
-            'dead_lettered_at'       => $deadLetteredAt,
-            'replay_notification_id' => null,
-            'replayed_at'            => null,
-            'created_at'             => $deadLetteredAt,
-            'updated_at'             => $deadLetteredAt,
-        ]);
-
-        foreach ($attempts as $attempt) {
-            DB::table('attempts')->insert([
-                'id'              => Str::uuid()->toString(),
-                'notification_id' => $notificationId,
-                'number'          => $attempt['number'],
-                'started_at'      => $attempt['started_at'],
-                'completed_at'    => $attempt['completed_at'] ?? null,
-                'succeeded'       => $attempt['succeeded']    ?? null,
-                'classification'  => $attempt['classification'] ?? null,
-                'reason'          => $attempt['reason']       ?? null,
-                'created_at'      => $attempt['started_at'],
-                'updated_at'      => $attempt['completed_at'] ?? $attempt['started_at'],
-            ]);
-        }
     }
 
     /**
