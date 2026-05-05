@@ -65,6 +65,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'dlq_admin' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/dlq_admin.log'),
+            'level' => env('LOG_DLQ_ADMIN_LEVEL', 'info'),
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
