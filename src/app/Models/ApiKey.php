@@ -53,6 +53,11 @@ final class ApiKey extends Model
         'revoked_at' => 'datetime',
     ];
 
+    public function getId(): string
+    {
+        return (string) $this->apiKeyId();
+    }
+
     /**
      * Whether the key carries the given scope. Matches the `admin` umbrella —
      * any key with `admin` is treated as having every scope.
