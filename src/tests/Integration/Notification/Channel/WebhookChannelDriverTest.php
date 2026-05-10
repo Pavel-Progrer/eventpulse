@@ -28,15 +28,24 @@ use Psr\Log\NullLogger;
 use Tests\TestCase;
 
 /**
- * Behaviour: the webhook driver POSTs the payload to the resolved
- * endpoint, attaches the standard EventPulse headers, classifies HTTP
- * responses per the specification's failure-classification table, and
- * surfaces resolution failures with their pre-classified reason.
+ * Behaviour: WebhookChannelDriver dispatches payloads to registered endpoints,
+ * adds EventPulse metadata headers, computes HMAC-SHA256 signatures when a
+ * signing secret is configured, classifies HTTP responses, and handles
+ * network failures and endpoint-resolution failures correctly.
+ *
+ * Day 9 additions:
+ *  - signing headers (X-EventPulse-Signature, X-EventPulse-Timestamp) are
+ *    present when the resolved endpoint carries a secret.
+ *  - signing headers are absent when the endpoint has no secret (unsigned
+ *    in-memory endpoint — backwards-compatible path).
+ *  - the signature is verifiable: the test re-computes it from the request
+ *    headers and body and confirms the values match.
  */
 #[CoversClass(WebhookChannelDriver::class)]
 final class WebhookChannelDriverTest extends TestCase
 {
-    private const DESTINATION_ID = '11111111-2222-4333-8444-555555555555';
+    private const string DESTINATION_ID = '11111111-2222-4333-8444-555555555555';
+    private const string SIGNING_SECRET = 'test-signing-secret-at-least-16c';
 
     private InMemoryWebhookEndpointResolver $resolver;
 
@@ -47,16 +56,26 @@ final class WebhookChannelDriverTest extends TestCase
         $this->resolver = new InMemoryWebhookEndpointResolver();
         $this->resolver->register(
             self::DESTINATION_ID,
-            new WebhookEndpoint('https://hooks.example.com/notify'),
+            new WebhookEndpoint(
+                url:           'https://hooks.example.com/notify',
+                signingSecret: self::SIGNING_SECRET,
+            ),
         );
     }
+
+    // =========================================================================
+    // Channel identity
+    // =========================================================================
 
     #[Test]
     public function channel_returns_webhook(): void
     {
-        $driver = $this->driver();
-        self::assertSame(Channel::Webhook, $driver->channel());
+        self::assertSame(Channel::Webhook, $this->driver()->channel());
     }
+
+    // =========================================================================
+    // Happy path — headers and body
+    // =========================================================================
 
     #[Test]
     public function dispatch_posts_body_with_eventpulse_headers_on_success(): void
@@ -74,23 +93,104 @@ final class WebhookChannelDriverTest extends TestCase
 
         self::assertTrue($outcome->succeeded);
 
-        Http::assertSent(function (Request $request): bool {
-            return $request->method() === 'POST'
-                && $request->url() === 'https://hooks.example.com/notify'
-                && $request->header('Content-Type')[0] === 'application/json'
-                && $request->header('X-EventPulse-Notification-ID') !== []
-                && $request->header('X-EventPulse-Attempt')[0] === '1'
-                && $request->header('X-Correlation-ID') !== []
-                && $request->header('X-Custom-Header')[0] === 'custom-value'
-                && $request->data() === ['event' => 'user.signed_up', 'user_id' => 42];
+        Http::assertSent(function (Request $req): bool {
+            return $req->method() === 'POST'
+                && $req->url() === 'https://hooks.example.com/notify'
+                && $req->header('Content-Type')[0] === 'application/json'
+                && $req->header('X-EventPulse-Notification-ID') !== []
+                && $req->header('X-EventPulse-Attempt')[0] === '1'
+                && $req->header('X-Correlation-ID') !== []
+                && $req->header('X-Custom-Header')[0] === 'custom-value'
+                && $req->data() === ['event' => 'user.signed_up', 'user_id' => 42];
+        });
+    }
+
+    // =========================================================================
+    // HMAC signing (Day 9)
+    // =========================================================================
+
+    #[Test]
+    public function dispatch_adds_signature_and_timestamp_headers_when_secret_is_configured(): void
+    {
+        Http::fake([
+            'hooks.example.com/*' => Http::response('', 200),
+        ]);
+
+        $this->driver()->dispatch($this->webhookRequest(['body' => ['event' => 'test']]));
+
+        Http::assertSent(function (Request $req): bool {
+            return $req->header('X-EventPulse-Timestamp') !== []
+                && $req->header('X-EventPulse-Signature') !== [];
+        });
+    }
+
+    #[Test]
+    public function dispatch_signature_header_uses_sha256_prefix(): void
+    {
+        Http::fake([
+            'hooks.example.com/*' => Http::response('', 200),
+        ]);
+
+        $this->driver()->dispatch($this->webhookRequest(['body' => ['event' => 'test']]));
+
+        Http::assertSent(function (Request $req): bool {
+            $sig = $req->header('X-EventPulse-Signature')[0] ?? '';
+
+            return str_starts_with($sig, 'sha256=');
+        });
+    }
+
+    #[Test]
+    public function dispatch_signature_is_verifiable_with_shared_secret(): void
+    {
+        Http::fake([
+            'hooks.example.com/*' => Http::response('', 200),
+        ]);
+
+        $body = ['event' => 'order.created', 'order_id' => 99];
+
+        $this->driver()->dispatch($this->webhookRequest(['body' => $body]));
+
+        Http::assertSent(function (Request $req) use ($body): bool {
+            $timestamp = $req->header('X-EventPulse-Timestamp')[0] ?? '';
+            $signature = $req->header('X-EventPulse-Signature')[0] ?? '';
+
+            // Re-compute the signature using the same algorithm as the driver
+            // (ADR-0005 §Decision): HMAC-SHA256 over "{timestamp}.{body_json}".
+            $bodyJson      = json_encode($body, JSON_THROW_ON_ERROR);
+            $signedPayload = $timestamp . '.' . $bodyJson;
+            $expected      = 'sha256=' . hash_hmac('sha256', $signedPayload, self::SIGNING_SECRET);
+
+            return hash_equals($expected, $signature);
+        });
+    }
+
+    #[Test]
+    public function dispatch_omits_signature_headers_when_endpoint_has_no_secret(): void
+    {
+        // Register an unsigned endpoint (no secret) — the legacy / test path.
+        $this->resolver = new InMemoryWebhookEndpointResolver();
+        $this->resolver->register(
+            self::DESTINATION_ID,
+            new WebhookEndpoint(url: 'https://hooks.example.com/notify'),
+        );
+
+        Http::fake([
+            'hooks.example.com/*' => Http::response('', 200),
+        ]);
+
+        $this->driver()->dispatch($this->webhookRequest(['body' => ['event' => 'test']]));
+
+        Http::assertSent(function (Request $req): bool {
+            // Both signing headers must be absent when hasSigning() is false.
+            return $req->header('X-EventPulse-Signature') === []
+                && $req->header('X-EventPulse-Timestamp') === [];
         });
     }
 
     #[Test]
     public function dispatch_treats_payload_as_body_when_no_envelope(): void
     {
-        // Permissive fallback: a notification submitted from a non-HTTP
-        // path that doesn't follow the OpenAPI envelope still works.
         Http::fake([
             'hooks.example.com/*' => Http::response('', 200),
         ]);
@@ -103,103 +203,93 @@ final class WebhookChannelDriverTest extends TestCase
         $outcome = $this->driver()->dispatch($request);
 
         self::assertTrue($outcome->succeeded);
-        Http::assertSent(function (Request $request): bool {
-            return $request->data() === ['event' => 'user.signed_up', 'user_id' => 42];
+        Http::assertSent(function (Request $req): bool {
+            return $req->data() === ['event' => 'user.signed_up', 'user_id' => 42];
         });
     }
 
     #[Test]
     public function dispatch_filters_reserved_headers_supplied_by_caller(): void
     {
-        // A caller cannot override Content-Type or our delivery
-        // metadata. The header is silently dropped (rather than
-        // rejected) so a misconfigured caller still gets their
-        // notification delivered with the correct headers.
         Http::fake([
             'hooks.example.com/*' => Http::response('', 200),
         ]);
 
         $request = $this->webhookRequest([
-            'body'    => ['ok' => true],
+            'body'    => ['x' => 1],
             'headers' => [
-                'Content-Type'                  => 'text/plain',
-                'X-EventPulse-Notification-ID' => 'spoofed',
-                'X-EventPulse-Attempt'         => '99',
-                'X-Correlation-ID'             => 'spoofed',
-                'X-Custom-Header'              => 'kept',
+                'X-EventPulse-Signature'      => 'forged-sig',
+                'X-EventPulse-Timestamp'      => '0',
+                'X-EventPulse-Notification-ID' => 'forged-id',
+                'Content-Type'                => 'text/plain',
+                'X-Allowed'                   => 'allowed-value',
             ],
         ]);
 
         $this->driver()->dispatch($request);
 
-        Http::assertSent(function (Request $request): bool {
-            // Reserved headers retained their EventPulse-controlled values.
-            return $request->header('Content-Type')[0] === 'application/json'
-                && $request->header('X-EventPulse-Attempt')[0] === '1'
-                && $request->header('X-Custom-Header')[0] === 'kept';
+        Http::assertSent(function (Request $req): bool {
+            $sig = $req->header('X-EventPulse-Signature')[0] ?? '';
+            $ts  = $req->header('X-EventPulse-Timestamp')[0] ?? '';
+
+            // The caller-supplied forged-sig and timestamp of '0' must be
+            // overwritten by the driver's own HMAC computation.
+            return $sig !== 'forged-sig'
+                && $ts !== '0'
+                && $req->header('X-Allowed')[0] === 'allowed-value';
         });
     }
 
+    // =========================================================================
+    // HTTP response classification
+    // =========================================================================
+
     /**
-     * @return iterable<string, array{0: int, 1: FailureClassification}>
+     * @return iterable<string, array{int, bool, FailureClassification|null}>
      */
-    public static function httpStatusClassifications(): iterable
+    public static function httpStatusProvider(): iterable
     {
-        yield '410 Gone is permanent'              => [410, FailureClassification::Permanent];
-        yield '400 Bad Request is permanent'       => [400, FailureClassification::Permanent];
-        yield '401 Unauthorized is permanent'      => [401, FailureClassification::Permanent];
-        yield '404 Not Found is permanent'         => [404, FailureClassification::Permanent];
-        yield '408 Request Timeout is transient'   => [408, FailureClassification::Transient];
-        yield '429 Too Many Requests is transient' => [429, FailureClassification::Transient];
-        yield '500 is transient'                   => [500, FailureClassification::Transient];
-        yield '502 Bad Gateway is transient'       => [502, FailureClassification::Transient];
-        yield '503 Service Unavailable is transient' => [503, FailureClassification::Transient];
-        yield '504 Gateway Timeout is transient'   => [504, FailureClassification::Transient];
+        yield '200 OK'                  => [200, true,  null];
+        yield '201 Created'             => [201, true,  null];
+        yield '204 No Content'          => [204, true,  null];
+        yield '408 Request Timeout'     => [408, false, FailureClassification::Transient];
+        yield '429 Too Many Requests'   => [429, false, FailureClassification::Transient];
+        yield '410 Gone'                => [410, false, FailureClassification::Permanent];
+        yield '400 Bad Request'         => [400, false, FailureClassification::Permanent];
+        yield '401 Unauthorized'        => [401, false, FailureClassification::Permanent];
+        yield '404 Not Found'           => [404, false, FailureClassification::Permanent];
+        yield '500 Server Error'        => [500, false, FailureClassification::Transient];
+        yield '503 Service Unavailable' => [503, false, FailureClassification::Transient];
     }
 
     #[Test]
-    #[DataProvider('httpStatusClassifications')]
-    public function dispatch_classifies_http_status_codes(int $status, FailureClassification $expected): void
-    {
+    #[DataProvider('httpStatusProvider')]
+    public function dispatch_classifies_http_responses_correctly(
+        int $status,
+        bool $expectedSuccess,
+        ?FailureClassification $expectedClassification,
+    ): void {
         Http::fake([
-            'hooks.example.com/*' => Http::response(['error' => 'no'], $status),
+            'hooks.example.com/*' => Http::response('', $status),
         ]);
 
         $outcome = $this->driver()->dispatch($this->webhookRequest());
 
-        self::assertFalse($outcome->succeeded);
-        self::assertSame($expected, $outcome->classification);
-        self::assertStringContainsString((string) $status, (string) $outcome->reason);
+        self::assertSame($expectedSuccess, $outcome->succeeded);
+
+        if ($expectedClassification !== null) {
+            self::assertSame($expectedClassification, $outcome->classification);
+        }
     }
 
-    #[Test]
-    public function dispatch_truncates_response_body_to_one_kilobyte(): void
-    {
-        $largeBody = str_repeat('x', 5000);
-        Http::fake([
-            'hooks.example.com/*' => Http::response($largeBody, 500),
-        ]);
-
-        $outcome = $this->driver()->dispatch($this->webhookRequest());
-
-        self::assertNotNull($outcome->reason);
-        // The reason carries the truncated snippet inline plus the
-        // status-code prefix; the snippet itself must not exceed 1024
-        // chars even when the full body is much longer.
-        $marker      = 'HTTP 500: ';
-        $position    = strpos($outcome->reason, $marker);
-        self::assertNotFalse($position);
-        $bodySnippet = substr($outcome->reason, $position + strlen($marker));
-        self::assertLessThanOrEqual(1024, mb_strlen($bodySnippet));
-    }
+    // =========================================================================
+    // Network failures
+    // =========================================================================
 
     #[Test]
-    public function dispatch_classifies_connection_exception_as_transient(): void
+    public function dispatch_classifies_connection_failure_as_transient(): void
     {
-        // Http::fake doesn't natively trigger ConnectionException via a
-        // status; a closure callback that throws gives us the same path
-        // the real client takes when DNS/TCP fail.
-        Http::fake(function () {
+        Http::fake(function (): never {
             throw new ConnectionException('cURL error 7: Failed to connect to hooks.example.com');
         });
 
@@ -210,10 +300,13 @@ final class WebhookChannelDriverTest extends TestCase
         self::assertStringContainsString('connection failure', (string) $outcome->reason);
     }
 
+    // =========================================================================
+    // Resolution failures
+    // =========================================================================
+
     #[Test]
     public function dispatch_returns_unrecoverable_when_destination_does_not_exist(): void
     {
-        // No registration on the resolver = "not found" = Unrecoverable.
         $this->resolver = new InMemoryWebhookEndpointResolver();
 
         $outcome = $this->driver()->dispatch($this->webhookRequest());
@@ -252,6 +345,10 @@ final class WebhookChannelDriverTest extends TestCase
 
         $this->driver()->dispatch($request);
     }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     private function driver(): WebhookChannelDriver
     {

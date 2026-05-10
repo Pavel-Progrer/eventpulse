@@ -9,6 +9,8 @@ use EventPulse\Application\Notification\Exception\IdempotencyConflictException;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationTransitionException;
 use EventPulse\Domain\Notification\Exception\RecipientChannelMismatchException;
+use EventPulse\Domain\WebhookDestination\Exception\WebhookDestinationAlreadyDisabledException;
+use EventPulse\Domain\WebhookDestination\Exception\WebhookDestinationNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -27,22 +29,17 @@ use Throwable;
  * (the `withExceptions` closure) treats null as "fall through to Laravel's
  * default rendering." Returning a JsonResponse short-circuits.
  *
+ * Day 8 backfill (missed at the time):
+ *  - `DeadLetteredNotificationNotFoundException` → 404 NOT_FOUND
+ *
+ * Day 9 additions:
+ *  - `WebhookDestinationNotFoundException` → 404 NOT_FOUND
+ *  - `WebhookDestinationAlreadyDisabledException` → 409 ALREADY_DISABLED
+ *
  * Envelope contract:
  *   - `error.code`     — machine-readable error type (stable; clients branch on this).
- *   - `error.message`  — client-facing copy, written for end-users. Stable across
- *                        versions; safe for UIs to display verbatim. Never
- *                        sourced from `Throwable::getMessage()` directly.
- *   - `error.details`  — structured supplementary data. Includes `reason` for
- *                        engineer-facing diagnostic strings (the raw exception
- *                        message), plus error-specific fields like
- *                        `idempotency_key` or `fields` (for ValidationError).
- *
- * The split between `message` and `details.reason` exists because domain
- * exception messages reference internal terminology (state names, VO
- * factory names, field identifiers) that is correct for engineers reading
- * logs but inappropriate as user-facing copy. Keeping the boundary explicit
- * means the surface clients build against does not silently shift when a
- * domain exception's message text is reworded.
+ *   - `error.message`  — client-facing copy, written for end-users.
+ *   - `error.details`  — structured supplementary data.
  */
 final class ApiExceptionRenderer
 {
@@ -103,22 +100,34 @@ final class ApiExceptionRenderer
         }
 
         if ($e instanceof DeadLetteredNotificationNotFoundException) {
-            // 404 for three failure modes: the id doesn't exist, the
-            // notification is in another tenant's scope, or the notification
-            // is in a non-DLQ status. Returning the same code for all three
-            // is a deliberate information-disclosure choice — see the
-            // exception's own docblock and ADR-0006 §"DLQ visibility is
-            // tenant-scoped".
-            //
-            // The diagnostic message stays in `details.reason` for log
-            // archaeology; the client-facing message is intentionally
-            // generic.
+            // Covers: id not found, cross-tenant id, and notification exists
+            // but is not dead-lettered. All three render as 404 — distinguishing
+            // them would leak information about which notification ids exist for
+            // other tenants, or expose the internal status of a notification the
+            // caller does not have permission to read via this endpoint.
             return $this->envelope(
                 code:          'NOT_FOUND',
-                message:       'No dead-lettered notification with that id is visible.',
+                message:       'The requested dead-letter entry does not exist or is not accessible.',
                 status:        Response::HTTP_NOT_FOUND,
                 correlationId: $correlationId,
-                details:       null,
+            );
+        }
+
+        if ($e instanceof WebhookDestinationNotFoundException) {
+            return $this->envelope(
+                code:          'NOT_FOUND',
+                message:       'The webhook destination does not exist or is not accessible.',
+                status:        Response::HTTP_NOT_FOUND,
+                correlationId: $correlationId,
+            );
+        }
+
+        if ($e instanceof WebhookDestinationAlreadyDisabledException) {
+            return $this->envelope(
+                code:          'ALREADY_DISABLED',
+                message:       'This webhook destination is already disabled.',
+                status:        Response::HTTP_CONFLICT,
+                correlationId: $correlationId,
             );
         }
 

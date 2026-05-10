@@ -8,6 +8,7 @@ use EventPulse\Application\Notification\Channel\ChannelDriver;
 use EventPulse\Application\Notification\Channel\DispatchOutcome;
 use EventPulse\Application\Notification\Channel\DispatchRequest;
 use EventPulse\Application\Notification\Channel\Exception\WebhookEndpointResolutionException;
+use EventPulse\Application\Notification\Channel\WebhookEndpoint;
 use EventPulse\Application\Notification\Channel\WebhookEndpointResolver;
 use EventPulse\Domain\Notification\Enum\Channel;
 use EventPulse\Domain\Notification\Enum\FailureClassification;
@@ -20,53 +21,59 @@ use Psr\Log\LoggerInterface;
 /**
  * POSTs notification payloads to a registered webhook destination.
  *
- * The driver depends on `WebhookEndpointResolver` to translate a
- * destination id (carried by `WebhookRecipient`) into a usable URL. Day 9
- * widens that resolved endpoint to include the signing secret and the
- * driver gains the HMAC headers; Day 5 ships the basic POST.
+ * Day 9 additions over Day 5:
+ *  - `X-EventPulse-Signature` and `X-EventPulse-Timestamp` headers for
+ *    HMAC-SHA256 origin verification (ADR-0005).
+ *  - The signing secret is sourced from `WebhookEndpoint::signingSecret()`
+ *    (decrypted by `EloquentWebhookEndpointResolver`). The driver adds the
+ *    header when a secret is present; it omits it when `hasSigning()` is
+ *    false, which happens only in in-memory test resolvers and the legacy
+ *    unconfigured stub. This makes signing opt-in per-resolver, not
+ *    opt-in per-driver, so production dispatch always signs.
+ *
+ * Signature scheme (see ADR-0005 §Decision):
+ *  ```
+ *  timestamp = Unix timestamp (seconds, UTC)
+ *  signed_payload = "{timestamp}.{request_body_json}"
+ *  signature = HMAC-SHA256(secret, signed_payload), hex-encoded
+ *  X-EventPulse-Timestamp: {timestamp}
+ *  X-EventPulse-Signature: sha256={signature}
+ *  ```
  *
  * Failure classification (specification §6.1):
  *  - 2xx                                   → success
  *  - 408 (timeout), 429 (rate limit), 5xx  → `Transient` (retryable)
- *  - other 4xx                             → `Permanent` (the receiver
- *    consistently rejects this; retrying won't help)
- *  - 410 Gone                              → `Permanent`. The receiver
- *    has explicitly told us it no longer accepts traffic at this URL —
- *    the spec mentions this as the canonical "stop trying" signal.
- *  - connection refused / DNS / TLS errors → `Transient`. These are
- *    network-state issues that may resolve on retry.
- *  - malformed endpoint, missing destination → `Unrecoverable`. The
- *    notification cannot ever succeed against a target that doesn't
- *    exist; dead-letter immediately.
+ *  - other 4xx                             → `Permanent`
+ *  - 410 Gone                              → `Permanent`
+ *  - connection refused / DNS / TLS errors → `Transient`
+ *  - malformed endpoint, missing destination → `Unrecoverable`
  *
  * Why we always read the response body (truncated):
  *  failure debugging in webhooks is hard because the operator usually
  *  doesn't own the receiving side. Capturing a fragment of the body —
- *  capped to 1 KB so a misbehaving receiver dumping a 10 MB stack trace
- *  doesn't bloat our database — gives the operator the receiver's own
- *  error message, which is usually the fastest way to diagnose.
+ *  capped to 1 KB — gives the operator the receiver's own error message.
  *
  * Body shape:
  *  Per the OpenAPI contract, webhook payloads have the shape
  *  `{body: {...}, headers?: {...}}`. The driver sends `body` as the JSON
  *  request body and `headers` (if present) as additional request headers.
  *  When the payload was constructed from a non-HTTP path and lacks the
- *  `body` envelope, the entire payload becomes the body — the
- *  permissive fallback keeps the driver usable from Artisan and
- *  internal callers without forcing the OpenAPI shape to leak into the
- *  domain.
+ *  `body` envelope, the entire payload becomes the body — the permissive
+ *  fallback keeps the driver usable from Artisan and internal callers.
  */
 final class WebhookChannelDriver implements ChannelDriver
 {
-    private const int RESPONSE_BODY_SNIPPET_BYTES = 1024;
-    private const int DEFAULT_TIMEOUT_SECONDS    = 30;
-    private const string USER_AGENT              = 'EventPulse/1.0';
+    private const int    RESPONSE_BODY_SNIPPET_BYTES = 1024;
+    private const int    DEFAULT_TIMEOUT_SECONDS     = 30;
+    private const string USER_AGENT                  = 'EventPulse/1.0';
+    private const string SIGNATURE_ALGORITHM         = 'sha256';
+
     /**
-     * Headers a caller is not allowed to override via the payload's
-     * `headers` field. Reserving them prevents a caller from spoofing
-     * EventPulse's own delivery metadata or breaking transport semantics.
+     * Headers a caller is not allowed to override via the payload's `headers`
+     * field. Reserving them prevents spoofing EventPulse's delivery metadata
+     * or breaking transport semantics.
      */
-    private const RESERVED_HEADERS = [
+    private const array RESERVED_HEADERS = [
         'content-type',
         'content-length',
         'host',
@@ -77,13 +84,6 @@ final class WebhookChannelDriver implements ChannelDriver
         'x-eventpulse-timestamp',
     ];
 
-    /**
-     * @param int $timeoutSeconds Per-request timeout. 30s by default,
-     *                            matching the `DispatchNotificationJob::$timeout`
-     *                            calculation: well under the worker
-     *                            timeout, well over the typical receiver
-     *                            response time.
-     */
     public function __construct(
         private readonly HttpFactory $http,
         private readonly WebhookEndpointResolver $endpointResolver,
@@ -131,19 +131,25 @@ final class WebhookChannelDriver implements ChannelDriver
 
         [$body, $extraHeaders] = $this->extractBodyAndHeaders($request->payload->toArray());
 
-        $headers = $this->buildRequestHeaders($request, $extraHeaders);
+        $timestamp = (string) time();
+        $bodyJson  = json_encode($body, JSON_THROW_ON_ERROR);
+
+        $headers = $this->buildRequestHeaders(
+            request:      $request,
+            extraHeaders: $extraHeaders,
+            endpoint:     $endpoint,
+            timestamp:    $timestamp,
+            bodyJson:     $bodyJson,
+        );
 
         try {
             $response = $this->http
                 ->withHeaders($headers)
                 ->timeout($this->timeoutSeconds)
-                ->post($endpoint->url, $body);
+                ->post($endpoint->url(), $body);
         } catch (ConnectionException $e) {
-            // DNS, TLS, connection-refused, idle-read timeout. All of
-            // these are network-state issues; retry has a real chance of
-            // succeeding.
             $this->logger->warning('notification.webhook.connection_failed', $logContext + [
-                'url'             => $endpoint->url,
+                'url'             => $endpoint->url(),
                 'exception_class' => $e::class,
                 'reason'          => $e->getMessage(),
                 'classification'  => FailureClassification::Transient->value,
@@ -154,16 +160,10 @@ final class WebhookChannelDriver implements ChannelDriver
                 reason:         sprintf('connection failure: %s', $e->getMessage()),
             );
         } catch (\Throwable $e) {
-            // Anything else is a programmer error in the driver or its
-            // dependencies — the wrong URL shape, a misconfigured client,
-            // a timeout exception that didn't extend ConnectionException.
-            // Transient is the safe choice: the worker will retry, and
-            // if the bug is real the second try will surface it again.
             $this->logger->error('notification.webhook.unexpected_error', $logContext + [
-                'url'             => $endpoint->url,
+                'url'             => $endpoint->url(),
                 'exception_class' => $e::class,
                 'reason'          => $e->getMessage(),
-                'classification'  => FailureClassification::Permanent->value,
             ]);
 
             return DispatchOutcome::failure(
@@ -172,8 +172,43 @@ final class WebhookChannelDriver implements ChannelDriver
             );
         }
 
-        return $this->classifyResponse($response, $endpoint->url, $logContext);
+        return $this->classifyResponse($response, $endpoint->url(), $logContext);
     }
+
+    // ---------------------------------------------------------------------------
+    // HMAC signing
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Computes the `X-EventPulse-Signature` value.
+     *
+     * Signed payload = `{timestamp}.{body_json}`.
+     *
+     * Including the timestamp in the signed payload means an attacker who
+     * captures a valid signature cannot reuse it at a later timestamp — the
+     * receiver checks that the timestamp is within a tolerance window (e.g.
+     * ±5 minutes) and rejects signatures that have expired.
+     *
+     * Including the body in the signed payload binds the signature to the
+     * exact content of the request — an attacker cannot replay a genuine
+     * signature with a modified body.
+     *
+     * See ADR-0005 for the full rationale and the receiver verification steps.
+     */
+    private function computeSignature(string $secret, string $timestamp, string $bodyJson): string
+    {
+        $signedPayload = $timestamp . '.' . $bodyJson;
+
+        return self::SIGNATURE_ALGORITHM . '=' . hash_hmac(
+            self::SIGNATURE_ALGORITHM,
+            $signedPayload,
+            $secret,
+        );
+    }
+
+    // ---------------------------------------------------------------------------
+    // Private helpers
+    // ---------------------------------------------------------------------------
 
     /**
      * @param array<string, mixed> $payload
@@ -183,8 +218,7 @@ final class WebhookChannelDriver implements ChannelDriver
     {
         // OpenAPI shape: {body: {...}, headers?: {...}}
         if (isset($payload['body']) && is_array($payload['body'])) {
-            $body = $payload['body'];
-            /** @var array<string, string> $headers */
+            $body    = $payload['body'];
             $headers = [];
 
             if (isset($payload['headers']) && is_array($payload['headers'])) {
@@ -199,8 +233,6 @@ final class WebhookChannelDriver implements ChannelDriver
         }
 
         // Permissive fallback: treat the entire payload as the body.
-        // Used when the notification was constructed from a non-HTTP
-        // path that doesn't follow the OpenAPI envelope.
         return [$payload, []];
     }
 
@@ -208,16 +240,34 @@ final class WebhookChannelDriver implements ChannelDriver
      * @param array<string, string> $extraHeaders
      * @return array<string, string>
      */
-    private function buildRequestHeaders(DispatchRequest $request, array $extraHeaders): array
-    {
+    private function buildRequestHeaders(
+        DispatchRequest $request,
+        array $extraHeaders,
+        WebhookEndpoint $endpoint,
+        string $timestamp,
+        string $bodyJson,
+    ): array {
         $headers = [
-            'Content-Type'                => 'application/json',
-            'User-Agent'                  => self::USER_AGENT,
+            'Content-Type'                 => 'application/json',
+            'User-Agent'                   => self::USER_AGENT,
             'X-EventPulse-Notification-ID' => $request->notificationId->toString(),
             'X-EventPulse-Attempt'         => (string) $request->attemptNumber->toInt(),
             'X-Correlation-ID'             => $request->correlationId->toString(),
-            // Day 9 adds: X-EventPulse-Signature, X-EventPulse-Timestamp.
         ];
+
+        if ($endpoint->hasSigning()) {
+            // Timestamp and signature are added together — the timestamp is
+            // only meaningful to the receiver in the context of signature
+            // verification (replay-window check). Sending it without a
+            // signature would be noise; omitting both keeps the unsigned
+            // path clean.
+            $headers['X-EventPulse-Timestamp'] = $timestamp;
+            $headers['X-EventPulse-Signature'] = $this->computeSignature(
+                secret:    (string) $endpoint->signingSecret(),
+                timestamp: $timestamp,
+                bodyJson:  $bodyJson,
+            );
+        }
 
         foreach ($extraHeaders as $name => $value) {
             if (in_array(strtolower($name), self::RESERVED_HEADERS, strict: true)) {
@@ -250,10 +300,10 @@ final class WebhookChannelDriver implements ChannelDriver
         $classification = $this->classifyHttpStatus($status);
 
         $this->logger->warning('notification.webhook.dispatch_failed', $logContext + [
-            'url'             => $url,
-            'http_status'     => $status,
-            'classification'  => $classification->value,
-            'response_body'   => $bodySnippet,
+            'url'            => $url,
+            'http_status'    => $status,
+            'classification' => $classification->value,
+            'response_body'  => $bodySnippet,
         ]);
 
         return DispatchOutcome::failure(
@@ -268,15 +318,12 @@ final class WebhookChannelDriver implements ChannelDriver
 
     private function classifyHttpStatus(int $status): FailureClassification
     {
-        // 410 Gone: the spec calls this out — the receiver has told us
-        // explicitly to stop. Don't waste retries; permanent.
+        // 410 Gone: the receiver has told us explicitly to stop.
         if ($status === 410) {
             return FailureClassification::Permanent;
         }
 
-        // 408 (request timeout) and 429 (too many requests) are the
-        // 4xx codes that *are* retryable: the receiver is asking us to
-        // back off, not telling us our request is wrong.
+        // 408 (request timeout) and 429 (too many requests) are retryable 4xx.
         if ($status === 408 || $status === 429) {
             return FailureClassification::Transient;
         }
@@ -285,9 +332,6 @@ final class WebhookChannelDriver implements ChannelDriver
             return FailureClassification::Permanent;
         }
 
-        // 5xx, plus the (unlikely) 1xx and 3xx that fell through here:
-        // treat as transient. The receiver's own infrastructure may
-        // recover on retry.
         return FailureClassification::Transient;
     }
 }
