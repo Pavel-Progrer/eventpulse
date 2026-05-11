@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Dlq\GetDlqController;
 use App\Http\Controllers\Api\V1\Dlq\ListDlqController;
 use App\Http\Controllers\Api\V1\SubmitNotificationController;
+use App\Http\Controllers\Api\V1\WebhookDestination\DisableWebhookDestinationController;
+use App\Http\Controllers\Api\V1\WebhookDestination\ListWebhookDestinationsController;
+use App\Http\Controllers\Api\V1\WebhookDestination\RegisterWebhookDestinationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -13,35 +16,41 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | Versioned under `/api/v1/`. Endpoints implemented to date:
-|   POST /notifications      — Day 3, submit a notification
-|   GET  /dlq                — Day 8, list dead-lettered notifications
-|   GET  /dlq/{id}           — Day 8, inspect one dead-lettered notification
+|
+|   POST   /notifications              — Day 3: submit a notification
+|   GET    /dlq                        — Day 8: list dead-lettered notifications
+|   GET    /dlq/{id}                   — Day 8: inspect one dead-lettered notification
+|   POST   /webhook-destinations       — Day 9: register a webhook destination
+|   GET    /webhook-destinations       — Day 9: list webhook destinations
+|   DELETE /webhook-destinations/{id}  — Day 9: disable a webhook destination
 |
 | Coming in later days: notification status (GET /notifications/{id}),
-| webhook destinations CRUD, DLQ replay & discard.
+| DLQ replay & discard.
 |
 | Middleware:
-|  - `auth.api-key` — resolves the Bearer token to an `ApiKey` model and
-|    attaches it to the request. (HMAC verification arrives in Day 9.)
-|  - `scope:notifications:write` — required for POST /notifications.
-|  - `scope:dlq:read`            — required for the DLQ inspection endpoints.
+|  - `auth.api-key`              — resolves Bearer token → ApiKey model.
+|  - `scope:notifications:write` — POST /notifications.
+|  - `scope:dlq:read`            — DLQ inspection endpoints.
+|  - `scope:notifications:write` — webhook destination write operations.
+|  - `scope:notifications:read`  — webhook destination list.
 |
-| Per ADR-0006 §"DLQ visibility is tenant-scoped", the DLQ endpoints
-| also enforce a per-API-key data-layer filter — the middleware scope
-| controls "may this caller use the endpoint at all"; the data filter
-| controls "which rows are even visible." Two distinct concerns,
-| layered.
+| Scope choice for webhook destinations:
+|  The spec (openapi.yaml) assigns `notifications:write` to POST and DELETE
+|  on /webhook-destinations, and `notifications:read` to GET. This mirrors
+|  the notification resource scopes: managing destinations is part of managing
+|  the notification delivery capability for an API key.
 */
 
 Route::prefix('v1')
     ->middleware(['api', 'auth.api-key'])
     ->group(function (): void {
-        // ── Notifications ───────────────────────────────────────────────
+
+        // ── Notifications ────────────────────────────────────────────────
         Route::post('notifications', SubmitNotificationController::class)
             ->middleware('scope:notifications:write')
             ->name('api.v1.notifications.create');
 
-        // ── Dead-letter queue (inspection only — Day 8) ────────────────
+        // ── Dead-letter queue (inspection only — Day 8) ──────────────────
         Route::get('dlq', ListDlqController::class)
             ->middleware('scope:dlq:read')
             ->name('api.v1.dlq.list');
@@ -49,4 +58,17 @@ Route::prefix('v1')
         Route::get('dlq/{id}', GetDlqController::class)
             ->middleware('scope:dlq:read')
             ->name('api.v1.dlq.get');
+
+        // ── Webhook destinations (Day 9) ─────────────────────────────────
+        Route::post('webhook-destinations', RegisterWebhookDestinationController::class)
+            ->middleware('scope:notifications:write')
+            ->name('api.v1.webhook-destinations.create');
+
+        Route::get('webhook-destinations', ListWebhookDestinationsController::class)
+            ->middleware('scope:notifications:read')
+            ->name('api.v1.webhook-destinations.list');
+
+        Route::delete('webhook-destinations/{id}', DisableWebhookDestinationController::class)
+            ->middleware('scope:notifications:write')
+            ->name('api.v1.webhook-destinations.disable');
     });

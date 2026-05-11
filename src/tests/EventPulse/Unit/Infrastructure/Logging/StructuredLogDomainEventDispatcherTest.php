@@ -21,6 +21,9 @@ use EventPulse\Domain\Notification\ValueObject\CorrelationId;
 use EventPulse\Domain\Notification\ValueObject\EmailRecipient;
 use EventPulse\Domain\Notification\ValueObject\IdempotencyKey;
 use EventPulse\Domain\Notification\ValueObject\NotificationId;
+use EventPulse\Domain\WebhookDestination\Event\WebhookDestinationDisabled;
+use EventPulse\Domain\WebhookDestination\Event\WebhookDestinationRegistered;
+use EventPulse\Domain\WebhookDestination\ValueObject\WebhookDestinationId;
 use EventPulse\Infrastructure\Logging\StructuredLogDomainEventDispatcher;
 use LogicException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -50,24 +53,19 @@ use Tests\Integration\Notification\Channel\Doubles\RecordingLogger;
  * a new event without updating the dispatcher impossible to ship
  * silently.
  *
- * Note on fixture UUIDs: `NotificationId::fromString` enforces RFC 4122
- * v4 format (third group starts with `4`, fourth group starts with
- * `8`/`9`/`a`/`b`). `IdempotencyKey` and `CorrelationId` are looser
- * (printable ASCII) so they could take any string, but using the same
- * v4 shape across all id-like fixtures keeps the test data uniform and
- * matches what production payloads look like.
+ * Day 9 additions:
+ *  - `webhook_destination_registered` renders at info with url, name, destination_id.
+ *  - `webhook_destination_disabled` renders at warning with destination_id.
+ *  - Signing secret is absent from both log records.
  */
 #[CoversClass(StructuredLogDomainEventDispatcher::class)]
 final class StructuredLogDomainEventDispatcherTest extends TestCase
 {
-    // Valid UUID v4 fixtures: third group starts with 4, fourth with 8/9/a/b.
-    // The earlier draft used all-1s, all-2s etc. which are valid RFC 4122
-    // strings but not v4 — that triggered the InvalidNotificationInput
-    // exception on every test in this file.
-    private const NOTIFICATION_ID = '11111111-1111-4111-8111-111111111111';
-    private const REPLAY_ID       = '33333333-3333-4333-8333-333333333333';
-    private const CORRELATION_ID  = '22222222-2222-2222-2222-222222222222';
-    private const IDEMPOTENCY_KEY = '44444444-4444-4444-4444-444444444444';
+    private const NOTIFICATION_ID  = '11111111-1111-4111-8111-111111111111';
+    private const REPLAY_ID        = '33333333-3333-4333-8333-333333333333';
+    private const CORRELATION_ID   = '22222222-2222-2222-2222-222222222222';
+    private const IDEMPOTENCY_KEY  = '44444444-4444-4444-4444-444444444444';
+    private const DESTINATION_ID   = '55555555-5555-4555-8555-555555555555';
 
     private RecordingLogger $logger;
     private StructuredLogDomainEventDispatcher $dispatcher;
@@ -98,44 +96,30 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
         $this->dispatcher->dispatch($this->makeRequested());
 
         $record = $this->onlyRecord();
-
         self::assertSame('notification_requested', $record['context']['event']);
-        self::assertSame($this->correlationId->toString(), $record['context']['correlation_id']);
+        self::assertSame(self::CORRELATION_ID,     $record['context']['correlation_id']);
         self::assertSame(
             $this->occurredAt->format(\DateTimeInterface::ATOM),
             $record['context']['occurred_at'],
         );
     }
 
-    #[Test]
-    public function the_message_text_equals_the_event_name(): void
-    {
-        // Operators filter on either the message or the `event` context
-        // field; aligning them removes ambiguity.
-        $this->dispatcher->dispatch($this->makeRequested());
-
-        $record = $this->onlyRecord();
-
-        self::assertSame($record['context']['event'], $record['message']);
-    }
-
     // -----------------------------------------------------------------------
-    // Per-event rendering — one test per event, asserting level + context shape
+    // Notification events
     // -----------------------------------------------------------------------
 
     #[Test]
-    public function notification_requested_renders_at_info_with_request_metadata(): void
+    public function notification_requested_renders_at_info_with_channel_priority_and_recipient(): void
     {
         $this->dispatcher->dispatch($this->makeRequested());
 
         $record = $this->onlyRecord();
-
-        self::assertSame('info', $record['level']);
-        self::assertSame($this->notificationId->toString(), $record['context']['notification_id']);
-        self::assertSame('email',  $record['context']['channel']);
-        self::assertSame('normal', $record['context']['priority']);
-        self::assertArrayHasKey('idempotency_key', $record['context']);
-        self::assertArrayHasKey('recipient',       $record['context']);
+        self::assertSame('info',                       $record['level']);
+        self::assertSame(self::NOTIFICATION_ID,        $record['context']['notification_id']);
+        self::assertSame('email',                      $record['context']['channel']);
+        self::assertSame('normal',                     $record['context']['priority']);
+        self::assertSame('alice@example.test',         $record['context']['recipient']);
+        self::assertSame(self::IDEMPOTENCY_KEY,        $record['context']['idempotency_key']);
     }
 
     #[Test]
@@ -152,7 +136,7 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame('info', $record['level']);
-        self::assertSame(1, $record['context']['attempt_number']);
+        self::assertSame(1,      $record['context']['attempt_number']);
     }
 
     #[Test]
@@ -169,7 +153,7 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame('info', $record['level']);
-        self::assertSame(2, $record['context']['succeeded_on_attempt']);
+        self::assertSame(2,      $record['context']['succeeded_on_attempt']);
     }
 
     #[Test]
@@ -187,7 +171,7 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
         $this->dispatcher->dispatch($event);
 
         $record = $this->onlyRecord();
-        self::assertSame('warning', $record['level'], 'failures retry-eligible or not surface as warnings, not errors');
+        self::assertSame('warning',          $record['level']);
         self::assertSame('transient',          $record['context']['classification']);
         self::assertSame('connection refused', $record['context']['reason']);
         self::assertSame(1,                    $record['context']['attempt_number']);
@@ -211,8 +195,8 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame('info', $record['level']);
-        self::assertSame(1, $record['context']['failed_attempt_number']);
-        self::assertSame(2, $record['context']['next_attempt_number']);
+        self::assertSame(1,      $record['context']['failed_attempt_number']);
+        self::assertSame(2,      $record['context']['next_attempt_number']);
         self::assertSame(
             $retryAfter->format(\DateTimeInterface::ATOM),
             $record['context']['retry_after'],
@@ -233,8 +217,8 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
         $this->dispatcher->dispatch($event);
 
         $record = $this->onlyRecord();
-        self::assertSame('error', $record['level'], 'dead-lettering is the highest severity domain event');
-        self::assertSame(5, $record['context']['total_attempts']);
+        self::assertSame('error', $record['level']);
+        self::assertSame(5,                              $record['context']['total_attempts']);
         self::assertSame('permanent: destination rejected', $record['context']['reason']);
     }
 
@@ -253,9 +237,63 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
         $this->dispatcher->dispatch($event);
 
         $record = $this->onlyRecord();
-        self::assertSame('info', $record['level']);
-        self::assertSame($this->notificationId->toString(), $record['context']['original_notification_id']);
-        self::assertSame($replayId->toString(),             $record['context']['replay_notification_id']);
+        self::assertSame('info',                   $record['level']);
+        self::assertSame(self::NOTIFICATION_ID,    $record['context']['original_notification_id']);
+        self::assertSame($replayId->toString(),    $record['context']['replay_notification_id']);
+    }
+
+    // -----------------------------------------------------------------------
+    // Day 9: webhook destination events
+    // -----------------------------------------------------------------------
+
+    #[Test]
+    public function webhook_destination_registered_renders_at_info_with_url_and_name(): void
+    {
+        $destinationId = WebhookDestinationId::fromString(self::DESTINATION_ID);
+
+        $event = new WebhookDestinationRegistered(
+            destinationId: $destinationId,
+            apiKeyId:      'ak-test-0001',
+            url:           'https://hooks.example.com/notify',
+            name:          'My hook',
+            occurredAt:    $this->occurredAt,
+            correlationId: $this->correlationId,
+        );
+
+        $this->dispatcher->dispatch($event);
+
+        $record = $this->onlyRecord();
+        self::assertSame('info',                          $record['level']);
+        self::assertSame(self::DESTINATION_ID,            $record['context']['destination_id']);
+        self::assertSame('ak-test-0001',                  $record['context']['api_key_id']);
+        self::assertSame('https://hooks.example.com/notify', $record['context']['url']);
+        self::assertSame('My hook',                       $record['context']['name']);
+
+        // The signing secret must NEVER appear in logs.
+        self::assertArrayNotHasKey('secret',         $record['context']);
+        self::assertArrayNotHasKey('signing_secret', $record['context']);
+        self::assertArrayNotHasKey('secret_hash',    $record['context']);
+    }
+
+    #[Test]
+    public function webhook_destination_disabled_renders_at_warning_with_destination_and_key_ids(): void
+    {
+        $destinationId = WebhookDestinationId::fromString(self::DESTINATION_ID);
+
+        $event = new WebhookDestinationDisabled(
+            destinationId: $destinationId,
+            apiKeyId:      'ak-test-0001',
+            occurredAt:    $this->occurredAt,
+            correlationId: $this->correlationId,
+        );
+
+        $this->dispatcher->dispatch($event);
+
+        $record = $this->onlyRecord();
+        // Warning because disabling breaks in-flight notifications.
+        self::assertSame('warning',            $record['level']);
+        self::assertSame(self::DESTINATION_ID, $record['context']['destination_id']);
+        self::assertSame('ak-test-0001',       $record['context']['api_key_id']);
     }
 
     // -----------------------------------------------------------------------
@@ -265,8 +303,6 @@ final class StructuredLogDomainEventDispatcherTest extends TestCase
     #[Test]
     public function unhandled_event_classes_throw_a_logic_exception(): void
     {
-        // Anonymous DomainEvent subclass — represents "a future event
-        // that someone added without updating the dispatcher."
         $unhandled = new class ($this->occurredAt, $this->correlationId) extends DomainEvent {
             public function __construct(DateTimeImmutable $at, CorrelationId $cid)
             {

@@ -13,6 +13,8 @@ use EventPulse\Domain\Notification\Event\NotificationDispatchFailed;
 use EventPulse\Domain\Notification\Event\NotificationReplayed;
 use EventPulse\Domain\Notification\Event\NotificationRequested;
 use EventPulse\Domain\Notification\Event\NotificationScheduledForRetry;
+use EventPulse\Domain\WebhookDestination\Event\WebhookDestinationDisabled;
+use EventPulse\Domain\WebhookDestination\Event\WebhookDestinationRegistered;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -26,43 +28,21 @@ use Psr\Log\LoggerInterface;
  *
  * Why a single dispatcher with a `match` rather than per-event subscribers:
  *  - Every event today has the same destination (PSR-3 logger). Per-event
- *    subscribers would multiply the indirection without changing what
- *    happens.
+ *    subscribers would multiply the indirection without changing what happens.
  *  - The `match` is exhaustive: a new domain event added later won't compile
- *    against this dispatcher until a render branch is added — which is
- *    exactly the visibility we want for "did the operator add this event
- *    to the observability surface?" PHPStan / Psalm catch the gap.
- *  - The match-driven design keeps log shapes per-event-type stable. Adding
- *    a new field to one event's log shape is editing one branch, not
- *    threading a method down through every event class.
+ *    against this dispatcher until a render branch is added — which is exactly
+ *    the visibility we want for "did the operator add this event to the
+ *    observability surface?" PHPStan / Psalm catch the gap.
+ *  - The match-driven design keeps log shapes per-event-type stable. Adding a
+ *    new field to one event's log shape is editing one branch, not threading a
+ *    method down through every event class.
  *
- * Why correlation id is *the* anchor field:
- *  - The base `DomainEvent` class already carries one — every event has a
- *    correlation id by construction.
- *  - One correlation id flows through the HTTP request → the notification
- *    aggregate → every event the aggregate raises → every log line the
- *    dispatcher emits. A single grep against the JSON logs reconstructs the
- *    full lifecycle of one user-visible request, across the HTTP path and
- *    the worker path.
- *
- * Why event_name instead of class names:
- *  - Operator dashboards filter on `event` column values. Class names
- *    (FQCNs) are noisy and break when the namespace changes; the
- *    `eventName()` derived from the class basename is human-readable and
- *    stable across refactors.
- *  - A new query layer (e.g. when someone wants "show me every
- *    notification that scheduled a retry in the last hour") matches on
- *    `event_name = 'notification_scheduled_for_retry'` directly.
- *
- * What this dispatcher does *not* do:
- *  - It does not emit metrics. Metrics come from the same JSON stream via a
- *    log-to-metrics pipeline (LogQL or similar) that aggregates by
- *    `event_name` and `channel`. Doing it twice would multiply storage cost
- *    and risk drift.
- *  - It does not publish to an external event bus. That seam exists at the
- *    `DomainEventDispatcher` interface — a future `CompositeDomainEvent
- *    Dispatcher` can fan out to both this logger and a Kafka/NATS bus
- *    without changing any application service or the aggregate.
+ * Day 9 additions:
+ *  - `WebhookDestinationRegistered` — info; logs destination id, api_key_id,
+ *    and url. The signing secret is intentionally absent.
+ *  - `WebhookDestinationDisabled`   — warning; logs destination id and
+ *    api_key_id. Warning level because disabling a destination silently breaks
+ *    in-flight webhook notifications that reference it.
  */
 final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
 {
@@ -73,32 +53,17 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
     #[\Override]
     public function dispatch(DomainEvent $event): void
     {
-        // The render method returns (level, message, context). Splitting
-        // those out makes per-event-type-level decisions explicit and
-        // testable.
         [$level, $context] = $this->render($event);
 
         $context['event']          = $event->eventName();
         $context['correlation_id'] = $event->correlationId()->toString();
         $context['occurred_at']    = $event->occurredAt()->format(\DateTimeInterface::ATOM);
 
-        // The log message itself uses the event_name as the message string.
-        // Most structured-log pipelines key on the message text for indexing
-        // ahead of context fields; aligning the message and the `event`
-        // context field means dashboards work regardless of which the
-        // operator chose to filter on.
         $this->logger->log($level, $event->eventName(), $context);
     }
 
     /**
      * Map an event to (log level, structured context).
-     *
-     * The match is over `instanceof` because PHP doesn't yet support
-     * matching on class types directly. Every domain event in the
-     * Notification context has a branch; adding a new event without
-     * adding a branch falls through to the default and throws —
-     * intentional, because we'd rather know at boot than ship silent
-     * observability gaps.
      *
      * @return array{0: string, 1: array<string, mixed>}
      */
@@ -169,9 +134,34 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 ],
             ],
 
+            // ── Day 9: webhook destination lifecycle ─────────────────────────
+
+            $event instanceof WebhookDestinationRegistered => [
+                // Info: a new delivery target is available. The signing secret
+                // is intentionally omitted — it must never appear in logs.
+                'info',
+                [
+                    'destination_id' => $event->destinationId()->toString(),
+                    'api_key_id'     => $event->apiKeyId(),
+                    'url'            => $event->url(),
+                    'name'           => $event->name(),
+                ],
+            ],
+
+            $event instanceof WebhookDestinationDisabled => [
+                // Warning: disabling a destination will cause Permanent failures
+                // on any in-flight or subsequently submitted webhook notifications
+                // that reference it. Operators should be aware.
+                'warning',
+                [
+                    'destination_id' => $event->destinationId()->toString(),
+                    'api_key_id'     => $event->apiKeyId(),
+                ],
+            ],
+
             // No match: a domain event was added without a render branch.
-            // Fail loudly at the call site so the operator notices today,
-            // not after a week of missing log entries.
+            // Fail loudly so the gap is caught in tests, not after a week of
+            // missing log entries in production.
             default => throw new \LogicException(sprintf(
                 'StructuredLogDomainEventDispatcher has no render branch for event class "%s". '
                 . 'Add a match arm in render().',

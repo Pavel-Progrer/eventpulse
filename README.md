@@ -121,6 +121,66 @@ Dedup is done by indexed lookup against the `notifications.idempotency_key` colu
 
 Dispatch is asynchronous from acceptance: the HTTP path persists the notification and enqueues a job; the worker picks it up, claims an attempt, and runs the channel-specific dispatch logic. Priority is mapped to a queue name (`notifications-high`, `notifications-default`, `notifications-low`) so workers can be scaled per priority class.
 
+### Webhook destinations
+
+Before a webhook notification can be dispatched, the target URL must be
+registered as a **webhook destination**.
+
+```bash
+# Register a destination (returns the id and — once only — the plaintext secret).
+curl -X POST http://localhost:8080/api/v1/webhook-destinations \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-service.example.com/hooks",
+    "secret": "$(openssl rand -hex 32)",
+    "name": "My service"
+  }'
+# → 201 {"id": "...", "url": "...", "status": "active", "secret": "...", ...}
+#   Save the secret now — it is never returned again.
+```
+
+The returned `id` is what you pass as `recipient` in `POST /notifications`
+with `channel: webhook`.
+
+```bash
+# List destinations owned by the authenticated key.
+curl http://localhost:8080/api/v1/webhook-destinations \
+  -H "Authorization: Bearer $API_KEY"
+# → 200 {"data": [...], "meta": {"next_cursor": null}}
+
+# Disable a destination (soft delete — history is preserved).
+curl -X DELETE http://localhost:8080/api/v1/webhook-destinations/$DESTINATION_ID \
+  -H "Authorization: Bearer $API_KEY"
+# → 204 No Content
+```
+
+#### Outbound signing
+
+Every outbound webhook request carries two headers:
+
+```
+X-EventPulse-Timestamp: 1714298400
+X-EventPulse-Signature: sha256=<hex-encoded HMAC-SHA256>
+```
+
+The signature is computed over `{timestamp}.{json_request_body}` using the
+shared secret. Receiver verification (any language):
+
+```python
+import hashlib, hmac, time
+
+def verify(secret: str, body: bytes, timestamp: str, signature: str) -> bool:
+    # Reject stale timestamps (±5 minute window).
+    if abs(time.time() - int(timestamp)) > 300:
+        return False
+    signed = f"{timestamp}.".encode() + body
+    expected = "sha256=" + hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+```
+
+Full rationale in [ADR-0008](./docs/adr/0008-webhook-signature-verification.md).
+
 ---
 
 ## Testing
@@ -170,6 +230,7 @@ Testing philosophy and conventions are in [`docs/testing-strategy.md`](./docs/te
 ## Documentation
 
 - **[Architecture Decision Records](./docs/adr/)** — the reasoning behind every non-obvious choice
+  - **[ADR-0008 — Webhook signature verification](./docs/adr/0008-webhook-signature-verification.md)** — HMAC-SHA256 outbound signing scheme, secret storage, and replay-attack mitigation
 - **[Domain model](./docs/domain.md)** — aggregates, events, channels, invariants
 - **[Testing strategy](./docs/testing-strategy.md)** — pyramid layers, what's mocked where, and why
 - **[Deployment runbook](./docs/DEPLOYMENT.md)** — environment setup, migration order, rollback procedure *(from v0.2.0)*
