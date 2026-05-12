@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\RequireScope;
+use App\Http\Middleware\ThrottleApiRequests;
+use App\Http\Middleware\ThrottleIpRequests;
 use EventPulse\Application\Notification\Channel\ChannelDispatcher;
 use EventPulse\Application\Notification\Channel\ChannelDriver;
 use EventPulse\Application\Notification\Channel\WebhookEndpointResolver;
@@ -15,9 +17,14 @@ use EventPulse\Application\Notification\Retry\RetryPolicy;
 use EventPulse\Application\Shared\Clock;
 use EventPulse\Application\Shared\DomainEventDispatcher;
 use EventPulse\Application\Shared\SystemClock;
+use EventPulse\Application\WebhookDestination\Command\DisableWebhookDestinationHandler;
+use EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationHandler;
+use EventPulse\Application\WebhookDestination\Query\ListWebhookDestinationsQueryHandler;
 use EventPulse\Domain\Notification\Enum\Channel;
 use EventPulse\Domain\Notification\Repository\NotificationRepository;
+use EventPulse\Domain\WebhookDestination\Repository\WebhookDestinationRepository;
 use EventPulse\Infrastructure\Logging\StructuredLogDomainEventDispatcher;
+use EventPulse\Infrastructure\Notification\Channel\EloquentWebhookEndpointResolver;
 use EventPulse\Infrastructure\Notification\Channel\EmailChannelDriver;
 use EventPulse\Infrastructure\Notification\Channel\SmsChannelDriver;
 use EventPulse\Infrastructure\Notification\Channel\WebhookChannelDriver;
@@ -26,6 +33,7 @@ use EventPulse\Infrastructure\Notification\Persistence\EloquentNotificationRepos
 use EventPulse\Infrastructure\Notification\Queue\LaravelNotificationDispatchQueue;
 use EventPulse\Infrastructure\Notification\Retry\ChannelRetryPolicy;
 use EventPulse\Infrastructure\Notification\Retry\RetrySettings;
+use EventPulse\Infrastructure\WebhookDestination\Persistence\EloquentWebhookDestinationRepository;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Mail\Mailer;
@@ -57,18 +65,9 @@ use Random\Randomizer;
  *  2. `WebhookDestinationRepository` registered for the new CRUD operations.
  *  3. Three new application-layer handlers registered as singletons.
  *
- * IMPORTANT — why Day 9 classes are referenced via string FQCNs instead of
- * `use` statements:
- *  PHP resolves `use` statements at parse time. If any imported class file is
- *  missing from disk, PHP throws a fatal error when the file is first required,
- *  which prevents the entire provider from loading. Because this provider also
- *  registers the pre-Day-9 bindings (`NotificationRepository`, `Clock`, etc.),
- *  a parse-time fatal caused by a missing Day 9 class would silently break
- *  ALL bindings — causing 500s across every endpoint and every test, not just
- *  the webhook-destination ones. String FQCNs + `class_exists()` guards defer
- *  the check to runtime and scope the failure to the webhook-destination
- *  endpoints only. Once all Day 9 files are confirmed present, the string
- *  FQCNs can be replaced with proper `use` statements and this comment removed.
+ * Day 10 changes:
+ *  1. `throttle.api` middleware alias registered → `ThrottleApiRequests`.
+ *  2. `throttle.ip` middleware alias registered  → `ThrottleIpRequests`.
  */
 final class EventPulseServiceProvider extends ServiceProvider
 {
@@ -93,8 +92,10 @@ final class EventPulseServiceProvider extends ServiceProvider
 
     public function boot(Router $router): void
     {
-        $router->aliasMiddleware('auth.api-key', AuthenticateApiKey::class);
-        $router->aliasMiddleware('scope', RequireScope::class);
+        $router->aliasMiddleware('auth.api-key',  AuthenticateApiKey::class);
+        $router->aliasMiddleware('scope',         RequireScope::class);
+        $router->aliasMiddleware('throttle.api',  ThrottleApiRequests::class);
+        $router->aliasMiddleware('throttle.ip',   ThrottleIpRequests::class);
     }
 
     // ---------------------------------------------------------------------------
@@ -103,28 +104,23 @@ final class EventPulseServiceProvider extends ServiceProvider
 
     private function registerWebhookEndpointResolver(): void
     {
-        $resolverClass = 'EventPulse\\Infrastructure\\Notification\\Channel\\EloquentWebhookEndpointResolver';
-        $fallbackClass = 'EventPulse\\Infrastructure\\Notification\\Channel\\UnconfiguredWebhookEndpointResolver';
-
-        if (class_exists($resolverClass)) {
-            $this->app->singleton(
-                WebhookEndpointResolver::class,
-                function (Application $app) use ($resolverClass): WebhookEndpointResolver {
-                    return new $resolverClass(
-                        encrypter: $app->make(Encrypter::class),
-                        logger:    $app->make(LoggerInterface::class),
-                    );
-                },
-            );
-        } else {
-            $this->app->singleton(WebhookEndpointResolver::class, $fallbackClass);
-        }
+        $resolverClass = EloquentWebhookEndpointResolver::class;
+        
+        $this->app->singleton(
+            WebhookEndpointResolver::class,
+            function (Application $app) use ($resolverClass): WebhookEndpointResolver {
+                return new $resolverClass(
+                    encrypter: $app->make(Encrypter::class),
+                    logger:    $app->make(LoggerInterface::class),
+                );
+            },
+        );
     }
 
     private function registerWebhookDestinationRepository(): void
     {
-        $repositoryInterface = 'EventPulse\\Domain\\WebhookDestination\\Repository\\WebhookDestinationRepository';
-        $repositoryClass     = 'EventPulse\\Infrastructure\\WebhookDestination\\Persistence\\EloquentWebhookDestinationRepository';
+        $repositoryInterface = WebhookDestinationRepository::class;
+        $repositoryClass     = EloquentWebhookDestinationRepository::class;
 
         if (!class_exists($repositoryClass)) {
             return;
@@ -136,9 +132,9 @@ final class EventPulseServiceProvider extends ServiceProvider
         );
 
         foreach ([
-            'EventPulse\\Application\\WebhookDestination\\Command\\RegisterWebhookDestinationHandler',
-            'EventPulse\\Application\\WebhookDestination\\Command\\DisableWebhookDestinationHandler',
-            'EventPulse\\Application\\WebhookDestination\\Query\\ListWebhookDestinationsQueryHandler',
+            RegisterWebhookDestinationHandler::class,
+            DisableWebhookDestinationHandler::class,
+            ListWebhookDestinationsQueryHandler::class,
         ] as $handlerClass) {
             if (class_exists($handlerClass)) {
                 $this->app->singleton($handlerClass);
