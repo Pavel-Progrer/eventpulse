@@ -11,8 +11,12 @@ use App\Http\Middleware\ThrottleIpRequests;
 use EventPulse\Application\Notification\Channel\ChannelDispatcher;
 use EventPulse\Application\Notification\Channel\ChannelDriver;
 use EventPulse\Application\Notification\Channel\WebhookEndpointResolver;
+use EventPulse\Application\Notification\Command\DiscardDeadLetteredHandler;
+use EventPulse\Application\Notification\Command\ReplayDeadLetteredHandler;
 use EventPulse\Application\Notification\DeadLetter\Query\DeadLetteredNotificationsRepository;
 use EventPulse\Application\Notification\NotificationDispatchQueue;
+use EventPulse\Application\Notification\Query\GetNotificationQueryHandler;
+use EventPulse\Application\Notification\Query\ListNotificationsQueryHandler;
 use EventPulse\Application\Notification\Retry\RetryPolicy;
 use EventPulse\Application\Shared\Clock;
 use EventPulse\Application\Shared\DomainEventDispatcher;
@@ -53,21 +57,20 @@ use Random\Randomizer;
  *  - `Clock`                                (application) → `SystemClock`.
  *  - `DomainEventDispatcher`                (application) → `StructuredLogDomainEventDispatcher`.
  *  - `NotificationDispatchQueue`            (application) → `LaravelNotificationDispatchQueue`.
- *  - `WebhookEndpointResolver`              (application) → `EloquentWebhookEndpointResolver` (Day 9).
- *  - `WebhookDestinationRepository`         (domain)      → `EloquentWebhookDestinationRepository` (Day 9).
+ *  - `WebhookEndpointResolver`              (application) → `EloquentWebhookEndpointResolver`.
+ *  - `WebhookDestinationRepository`         (domain)      → `EloquentWebhookDestinationRepository`.
  *  - `ChannelDispatcher`                    (application) → constructed once with the three channel drivers.
  *  - `RetryPolicy`                          (application) → `ChannelRetryPolicy`.
  *  - `DeadLetteredNotificationsRepository`  (application) → `EloquentDeadLetteredNotificationsRepository`.
  *
- * Day 9 changes:
- *  1. `WebhookEndpointResolver` binding swapped from `UnconfiguredWebhookEndpointResolver`
- *     to `EloquentWebhookEndpointResolver`.
- *  2. `WebhookDestinationRepository` registered for the new CRUD operations.
- *  3. Three new application-layer handlers registered as singletons.
+ * Day 11 additions:
+ *  - `GetNotificationQueryHandler`    — serves `GET /notifications/{id}`.
+ *  - `ListNotificationsQueryHandler`  — serves `GET /notifications`.
+ *  - `ReplayDeadLetteredHandler`      — serves `POST /dlq/{id}/replay`.
+ *  - `DiscardDeadLetteredHandler`     — serves `DELETE /dlq/{id}`.
  *
- * Day 10 changes:
- *  1. `throttle.api` middleware alias registered → `ThrottleApiRequests`.
- *  2. `throttle.ip` middleware alias registered  → `ThrottleIpRequests`.
+ * All four are registered as singletons. They have no mutable state —
+ * singletons are safe and avoid re-constructing collaborators per request.
  */
 final class EventPulseServiceProvider extends ServiceProvider
 {
@@ -88,6 +91,7 @@ final class EventPulseServiceProvider extends ServiceProvider
         $this->registerWebhookDestinationRepository();
         $this->registerChannelDispatcher();
         $this->registerRetryPolicy();
+        $this->registerNotificationHandlers();
     }
 
     public function boot(Router $router): void
@@ -99,17 +103,32 @@ final class EventPulseServiceProvider extends ServiceProvider
     }
 
     // ---------------------------------------------------------------------------
+    // Day 11 — notification read + DLQ write handlers
+    // ---------------------------------------------------------------------------
+
+    private function registerNotificationHandlers(): void
+    {
+        // Read handlers — no collaborators beyond the repository and clock,
+        // both of which are already bound above.
+        $this->app->singleton(GetNotificationQueryHandler::class);
+        $this->app->singleton(ListNotificationsQueryHandler::class);
+
+        // DLQ write handlers — need the dispatch queue and event dispatcher
+        // in addition to the repository and clock.
+        $this->app->singleton(ReplayDeadLetteredHandler::class);
+        $this->app->singleton(DiscardDeadLetteredHandler::class);
+    }
+
+    // ---------------------------------------------------------------------------
     // Day 9 — webhook destination infrastructure
     // ---------------------------------------------------------------------------
 
     private function registerWebhookEndpointResolver(): void
     {
-        $resolverClass = EloquentWebhookEndpointResolver::class;
-        
         $this->app->singleton(
             WebhookEndpointResolver::class,
-            function (Application $app) use ($resolverClass): WebhookEndpointResolver {
-                return new $resolverClass(
+            function (Application $app): WebhookEndpointResolver {
+                return new EloquentWebhookEndpointResolver(
                     encrypter: $app->make(Encrypter::class),
                     logger:    $app->make(LoggerInterface::class),
                 );
@@ -119,15 +138,14 @@ final class EventPulseServiceProvider extends ServiceProvider
 
     private function registerWebhookDestinationRepository(): void
     {
-        $repositoryInterface = WebhookDestinationRepository::class;
-        $repositoryClass     = EloquentWebhookDestinationRepository::class;
+        $repositoryClass = EloquentWebhookDestinationRepository::class;
 
-        if (!class_exists($repositoryClass)) {
+        if (! class_exists($repositoryClass)) {
             return;
         }
 
         $this->app->singleton(
-            $repositoryInterface,
+            WebhookDestinationRepository::class,
             fn (Application $app) => new $repositoryClass(encrypter: $app->make(Encrypter::class)),
         );
 

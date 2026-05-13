@@ -33,29 +33,23 @@ use Illuminate\Database\ConnectionInterface;
  *    `notifications`, `attempts`, and (when present) `dead_letter_marks`.
  *  - Eloquent → Aggregate (in `findById*()`): hydrate via
  *    `Notification::reconstitute()` so no domain events are raised.
- *
- * Day 8 closes the Day-4 hand-wave: attempts and the dead-letter mark
- * are now actually persisted and rehydrated. Before today, every
- * `findById()` returned a notification with `attempts: []`, which broke
- * any read path that needed the history (the DLQ admin endpoints, the
- * status endpoint when it ships, the `recordFailure` invariant when a
- * worker resumes a partially-completed retry sequence).
+ *  - Targeted write (in `markDiscarded()`): stamp one column on the
+ *    dead-letter mark row without loading the full aggregate.
  *
  * Concurrency and ordering inside `save()`:
- *  Wrapping the three-table write in a transaction keeps "the
- *  notification advanced its state" consistent with "the matching
- *  attempt and DL mark exist." Without the transaction, a worker crash
- *  between two writes could leave the notifications row reading
- *  `dead_lettered` while the `dead_letter_marks` row never made it.
- *  The transaction is short — three single-row upserts at most — so
- *  lock contention is not a concern.
+ *  Wrapping the three-table write in a transaction keeps "the notification
+ *  advanced its state" consistent with "the matching attempt and dead-letter
+ *  mark exist." Without the transaction, a crash between two writes could
+ *  leave the notifications row reading `dead_lettered` while the
+ *  `dead_letter_marks` row never made it. The transaction is short — three
+ *  single-row upserts at most — so lock contention is not a concern.
  *
  * Why upsert and not delete-then-insert for attempts:
  *  Attempts are append-only (invariant 5.1.4) — a save() that overwrites
- *  the table by deleting first would briefly violate the invariant in
- *  an observer's view of the database. Per-row upsert by
- *  (notification_id, number) preserves the invariant in the persistent
- *  layer just as the aggregate preserves it in memory.
+ *  the table by deleting first would briefly violate the invariant in an
+ *  observer's view of the database. Per-row upsert by (notification_id,
+ *  number) preserves the invariant in the persistent layer just as the
+ *  aggregate preserves it in memory.
  */
 final class EloquentNotificationRepository implements NotificationRepository
 {
@@ -66,7 +60,6 @@ final class EloquentNotificationRepository implements NotificationRepository
     #[\Override]
     public function save(Notification $notification): void
     {
-        // Three-table write inside a transaction — see class docblock.
         $this->connection->transaction(function () use ($notification): void {
             $this->saveRoot($notification);
             $this->saveAttempts($notification);
@@ -93,16 +86,24 @@ final class EloquentNotificationRepository implements NotificationRepository
         return $row === null ? null : $this->hydrate($row);
     }
 
+    #[\Override]
+    public function markDiscarded(NotificationId $id, DateTimeImmutable $at): void
+    {
+        // Idempotent: the `whereNull` guard means a second call on an already-
+        // discarded mark produces zero matched rows and zero updates — no error,
+        // no duplicate timestamp. The notification row itself is not touched.
+        EloquentDeadLetterMark::query()
+            ->where('notification_id', $id->toString())
+            ->whereNull('discarded_at')
+            ->update(['discarded_at' => $at]);
+    }
+
     // -----------------------------------------------------------------------
     // Save — three sub-steps, one transaction
     // -----------------------------------------------------------------------
 
     private function saveRoot(Notification $notification): void
     {
-        // updateOrCreate for the root row. Atomic at the row level under
-        // Postgres' default isolation given the schema's
-        // `notifications_idem_unique` constraint as the last line of
-        // defence against a race.
         EloquentNotification::query()->updateOrCreate(
             ['id' => $notification->id()->toString()],
             [
@@ -136,11 +137,6 @@ final class EloquentNotificationRepository implements NotificationRepository
                 'reason'          => $attempt->failureReason(),
             ];
 
-            // Keyed on (notification_id, number) per the unique index on
-            // the table. The DB-level `attempts_outcome_consistency_check`
-            // CHECK constraint refuses any row where (succeeded, classification,
-            // reason, completed_at) are inconsistent — same invariant the
-            // domain enforces, repeated at the persistence boundary.
             EloquentAttempt::query()->updateOrCreate(
                 [
                     'notification_id' => $notificationId,
@@ -156,10 +152,6 @@ final class EloquentNotificationRepository implements NotificationRepository
         $mark = $notification->deadLetterMark();
 
         if ($mark === null) {
-            // Defensive: if the aggregate's mark is null, there must not
-            // be a row. We do not delete here — the aggregate cannot
-            // "un-dead-letter" — but a never-dead-lettered notification
-            // simply has no mark to write.
             return;
         }
 
@@ -178,14 +170,9 @@ final class EloquentNotificationRepository implements NotificationRepository
     // Hydrate — reverse direction, called by findById* and the read model
     // -----------------------------------------------------------------------
 
-    /**
-     * Reconstitute the aggregate from a persisted row plus its attempts
-     * and (optional) dead-letter mark.
-     */
     private function hydrate(EloquentNotification $row): Notification
     {
-        $channel = Channel::from($row->channel);
-
+        $channel  = Channel::from($row->channel);
         $attempts = $this->loadAttempts($row->id);
         $mark     = $this->loadDeadLetterMark($row->id);
 
@@ -209,11 +196,11 @@ final class EloquentNotificationRepository implements NotificationRepository
     }
 
     /**
-     * @return array<int, Attempt> indexed by 1-based attempt number.
+     * @return array<int, Attempt> indexed by 1-based attempt number
      */
     private function loadAttempts(string $notificationId): array
     {
-        $rows = EloquentAttempt::query()
+        $rows     = EloquentAttempt::query()
             ->where('notification_id', $notificationId)
             ->orderBy('number')
             ->get();
@@ -221,18 +208,11 @@ final class EloquentNotificationRepository implements NotificationRepository
         $attempts = [];
 
         foreach ($rows as $row) {
-            // Reconstitute via the public constructor + state-transition
-            // methods. The Attempt entity has no separate `reconstitute`
-            // factory because the constructor + recordSuccess/Failure
-            // covers every legal in-memory state.
             $attempt = new Attempt(
                 AttemptNumber::fromInt($row->number),
                 $this->toUtc($row->started_at),
             );
 
-            // Apply the completion state if the attempt was finished.
-            // succeeded === null means "in progress" — leave the entity
-            // in its just-constructed state.
             if ($row->succeeded === true) {
                 $attempt->recordSuccess($this->toUtc($row->completed_at));
             } elseif ($row->succeeded === false) {
@@ -283,11 +263,6 @@ final class EloquentNotificationRepository implements NotificationRepository
         };
     }
 
-    /**
-     * Convert a Carbon-or-DateTimeInterface into the immutable UTC form
-     * the domain expects. Eloquent gives us `Carbon`; the aggregate
-     * accepts `DateTimeImmutable`. This is the conversion seam.
-     */
     private function toUtc(\DateTimeInterface $dt): DateTimeImmutable
     {
         return DateTimeImmutable::createFromInterface($dt)
