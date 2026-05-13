@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "feature/**"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: "8.4"
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # test
+  # ────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Test suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: eventpulse_test
+          POSTGRES_USER: eventpulse
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ env.PHP_VERSION }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, redis, pcov
+          coverage: pcov
+          ini-values: memory_limit=512M
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy .env.ci
+        run: cp .env.ci .env
+
+      - name: Generate application key
+        run: php artisan key:generate --ansi
+
+      - name: Run migrations
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: eventpulse_test
+          DB_USERNAME: eventpulse
+          DB_PASSWORD: secret
+        run: php artisan migrate --force --no-interaction
+
+      - name: Run unit tests (no DB, no Laravel bootstrap)
+        run: |
+          php artisan test \
+            --testsuite=Unit \
+            --parallel \
+            --stop-on-failure
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: eventpulse_test
+          DB_USERNAME: eventpulse
+          DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+
+      - name: Run feature & integration tests
+        run: |
+          php artisan test \
+            --testsuite=Feature \
+            --parallel \
+            --stop-on-failure \
+            --coverage-clover coverage.xml
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: eventpulse_test
+          DB_USERNAME: eventpulse
+          DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          MAIL_MAILER: log
+
+      - name: Upload coverage
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false   # don't block on upload failure; coverage is informational
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # static-analysis
+  # (skeleton only — Psalm and PHPStan configuration ships on Day 15)
+  # ────────────────────────────────────────────────────────────────────────────
+  static-analysis:
+    name: Static analysis (skeleton)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ env.PHP_VERSION }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Laravel Pint (code style)
+        run: ./vendor/bin/pint --test
+        # `--test` exits non-zero if any files would be changed, without
+        # modifying them. This enforces style in CI without auto-commits.
+
+      # Psalm and PHPStan stubs — these steps are intentionally commented out.
+      # They unblock on Day 15 (CI pipeline proper) once psalm.xml and
+      # phpstan.neon are committed with their baseline files. Running them
+      # without baselines would produce noise, not signal.
+      #
+      # - name: Psalm
+      #   run: ./vendor/bin/psalm --no-progress --output-format=github
+      #
+      # - name: PHPStan
+      #   run: ./vendor/bin/phpstan analyse --no-progress --error-format=github

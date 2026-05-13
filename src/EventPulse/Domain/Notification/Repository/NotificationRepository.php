@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\Repository;
 
+use DateTimeImmutable;
 use EventPulse\Domain\Notification\Aggregate\Notification;
 use EventPulse\Domain\Notification\ValueObject\IdempotencyKey;
 use EventPulse\Domain\Notification\ValueObject\NotificationId;
@@ -17,12 +18,30 @@ use EventPulse\Domain\Notification\ValueObject\NotificationId;
  * the infrastructure layer (`EloquentNotificationRepository`).
  *
  * The repository is intentionally minimal:
- *   - `save()`        — persist a new aggregate or an updated one. Implementations
- *                       are upserts; the aggregate itself owns its identity.
- *   - `findById()`    — reconstitute an aggregate by id, or return null if absent.
- *   - `findByIdempotencyKey()` — used by the application layer to detect repeat
- *                                submissions (per ADR-0003 and ADR-0004 once
- *                                idempotency dedup is implemented in Day 4).
+ *   - `save()`                — persist a new aggregate or an updated one.
+ *   - `findById()`            — reconstitute an aggregate by id, or null.
+ *   - `findByIdempotencyKey()` — dedup detection for the idempotent submit and
+ *                               replay paths.
+ *   - `markDiscarded()`       — stamp a dead-letter mark as acknowledged by an
+ *                               operator without loading or mutating the full
+ *                               aggregate (see below).
+ *
+ * **Why `markDiscarded()` belongs here rather than on a separate port.**
+ * Discard is a write operation scoped to the notification's persistence row.
+ * Adding a dedicated `DeadLetterMarkRepository` for a single method that
+ * touches one column would introduce a new port, a new binding, and a new test
+ * double for no architectural gain — the cohesion cost outweighs the
+ * separation benefit at this scale. If the dead-letter mark grows its own
+ * lifecycle (e.g. discard reasons, operator notes), a dedicated repository
+ * becomes the right extraction. For now, one port for one aggregate.
+ *
+ * **Why not go through `save()`.**
+ * Discard has no domain semantics — no invariant to enforce, no event to
+ * raise, no aggregate state to advance. Loading the full aggregate, mutating
+ * a field, and calling `save()` would be ceremony that slows tests and hides
+ * intent. `markDiscarded()` is a targeted write that says exactly what it
+ * does. The DLQ list query (`GET /dlq`) already filters on `discarded_at IS
+ * NULL`; this method is the write side of that contract.
  *
  * The repository raises no domain events of its own. Domain events live on
  * the aggregate and are released by the application layer via
@@ -41,11 +60,9 @@ interface NotificationRepository
      * Implementations must:
      *  1. Upsert the notification row keyed by `NotificationId`.
      *  2. Persist all attempts and the dead-letter mark consistently with the
-     *     aggregate's invariants. (For Day 3 only the root row is exercised;
-     *     attempts persistence is wired up in Day 4.)
+     *     aggregate's invariants.
      *  3. Be transactional: either all changes commit or none do.
      */
-    // TODO(Day 4) Add transaction boundary
     public function save(Notification $notification): void;
 
     /**
@@ -60,8 +77,20 @@ interface NotificationRepository
      * tuple. Returns null when no prior submission matches.
      *
      * Idempotency keys are scoped to the API key — two different callers using
-     * the same key value do not collide. The application layer uses this to
-     * implement the idempotent-replay contract (HTTP 200 vs 202; see OpenAPI).
+     * the same key value do not collide.
      */
     public function findByIdempotencyKey(string $apiKeyId, IdempotencyKey $key): ?Notification;
+
+    /**
+     * Stamp a dead-letter mark as discarded at the given timestamp.
+     *
+     * Idempotent: calling this on an already-discarded notification is a no-op.
+     * The notification row and its attempt history are not modified — only the
+     * `dead_letter_marks.discarded_at` column is set.
+     *
+     * The caller is responsible for verifying that the notification exists,
+     * is owned by the right API key, and is in the `dead_lettered` state before
+     * invoking this method. The repository does not re-validate those conditions.
+     */
+    public function markDiscarded(NotificationId $id, DateTimeImmutable $at): void;
 }

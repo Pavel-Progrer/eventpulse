@@ -5,44 +5,100 @@ declare(strict_types=1);
 namespace EventPulse\Infrastructure\Notification\Persistence;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use EventPulse\Application\Notification\DeadLetter\Query\DeadLetteredNotificationsRepository;
 use EventPulse\Application\Notification\DeadLetter\Query\DlqEntry;
 use EventPulse\Application\Notification\DeadLetter\Query\DlqEntryPage;
 use EventPulse\Application\Notification\DeadLetter\Query\ListDeadLetteredQuery;
 use EventPulse\Domain\Notification\Enum\Channel;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Eloquent/query-builder read model for {@see DeadLetteredNotificationsRepository}.
+ * Eloquent-backed implementation of `DeadLetteredNotificationsRepository`.
  *
- * Joins `dead_letter_marks` to `notifications` for tenant scoping and channel,
- * applies the same filter and cursor semantics as the in-memory test double,
- * and derives `final_attempt_at` from `MAX(attempts.completed_at)`.
+ * Produces the flat `DlqEntry` projection — not full aggregates. This is
+ * intentional: the list endpoint must be cheap (a single JOIN query with
+ * a correlated sub-select for `final_attempt_at`), not N+1 aggregate loads.
+ * The `GET /dlq/{id}` inspect endpoint earns full hydration (one row per
+ * call); the list does not.
+ *
+ * Query shape:
+ *   SELECT dlm.*, n.channel, n.api_key_id,
+ *          (SELECT MAX(a.completed_at)
+ *           FROM attempts a
+ *           WHERE a.notification_id = dlm.notification_id) AS final_attempt_at
+ *   FROM dead_letter_marks dlm
+ *   JOIN notifications n ON n.id = dlm.notification_id
+ *   WHERE n.api_key_id = ?
+ *     AND dlm.discarded_at IS NULL          -- default: exclude discarded entries
+ *     [AND dlm.reason = ?]
+ *     [AND n.channel = ?]
+ *     [AND dlm.dead_lettered_at > ?]
+ *     [AND dlm.dead_lettered_at < ?]
+ *     [cursor keyset clause]
+ *   ORDER BY dlm.dead_lettered_at DESC, dlm.id DESC
+ *   LIMIT ? + 1
+ *
+ * Cursor format: `{ISO-8601 UTC dead_lettered_at}|{dead_letter_mark uuid}`.
+ * The pipe delimiter is used (not `:`) to avoid ambiguity with the colon in
+ * ISO-8601 timestamps. Both segments are required for stable keyset pagination.
+ *
+ * Day 11 change: added `whereNull('dlm.discarded_at')` to the base query so
+ * that entries acknowledged via `DELETE /api/v1/dlq/{id}` disappear from the
+ * default list view. The condition is unconditional — there is no
+ * `include_discarded` parameter in Phase 1.
  */
 final class EloquentDeadLetteredNotificationsRepository implements DeadLetteredNotificationsRepository
 {
+    private const int MAX_LIMIT = 100;
+
     #[\Override]
     public function list(ListDeadLetteredQuery $query): DlqEntryPage
     {
-        $fetchLimit = $query->limit + 1;
+        $limit = min($query->limit, self::MAX_LIMIT);
 
-        $builder = DB::table('dead_letter_marks as dlm')
-            ->join('notifications as n', 'dlm.notification_id', '=', 'n.id')
+        $rows = $this->baseQuery($query)
+            ->limit($limit + 1)
+            ->get();
+
+        $hasMore = $rows->count() > $limit;
+        if ($hasMore) {
+            $rows->pop();
+        }
+
+        $entries    = $rows->map(fn (object $row): DlqEntry => $this->project($row))->values()->all();
+        $nextCursor = ($hasMore && count($entries) > 0)
+            ? $this->encodeCursor(end($entries))
+            : null;
+
+        return new DlqEntryPage(entries: $entries, nextCursor: $nextCursor);
+    }
+
+    private function baseQuery(ListDeadLetteredQuery $query): Builder
+    {
+        $builder = DB::table('dead_letter_marks AS dlm')
+            ->join('notifications AS n', 'n.id', '=', 'dlm.notification_id')
+            ->selectRaw('
+                dlm.id,
+                dlm.notification_id,
+                dlm.reason,
+                dlm.dead_lettered_at,
+                dlm.replay_notification_id,
+                dlm.replayed_at,
+                dlm.discarded_at,
+                n.channel,
+                (
+                    SELECT MAX(a.completed_at)
+                    FROM attempts a
+                    WHERE a.notification_id = dlm.notification_id
+                ) AS final_attempt_at
+            ')
             ->where('n.api_key_id', $query->apiKeyId)
-            ->select([
-                'dlm.id',
-                'dlm.notification_id',
-                'dlm.reason',
-                'n.channel',
-                'dlm.dead_lettered_at',
-                'dlm.replay_notification_id',
-                'dlm.replayed_at',
-            ])
-            ->selectRaw(
-                '(SELECT MAX(completed_at) FROM attempts AS a '
-                . 'WHERE a.notification_id = n.id AND a.completed_at IS NOT NULL) AS final_attempt_at',
-            );
+            // Day 11: exclude discarded entries from the default view.
+            ->whereNull('dlm.discarded_at')
+            ->orderBy('dlm.dead_lettered_at', 'desc')
+            ->orderBy('dlm.id', 'desc');
 
         if ($query->reason !== null) {
             $builder->where('dlm.reason', $query->reason);
@@ -53,102 +109,77 @@ final class EloquentDeadLetteredNotificationsRepository implements DeadLetteredN
         }
 
         if ($query->createdAfter !== null) {
-            $builder->where('dlm.dead_lettered_at', '>=', $query->createdAfter);
+            $builder->where('dlm.dead_lettered_at', '>', $query->createdAfter->format('Y-m-d H:i:s'));
         }
 
         if ($query->createdBefore !== null) {
-            $builder->where('dlm.dead_lettered_at', '<', $query->createdBefore);
+            $builder->where('dlm.dead_lettered_at', '<', $query->createdBefore->format('Y-m-d H:i:s'));
         }
 
         if ($query->cursor !== null) {
-            [$cursorTs, $cursorId] = $this->decodeCursor($query->cursor);
-            $builder->where(static function ($q) use ($cursorTs, $cursorId): void {
-                $q->where('dlm.dead_lettered_at', '<', $cursorTs)
-                    ->orWhere(static function ($q2) use ($cursorTs, $cursorId): void {
-                        $q2->where('dlm.dead_lettered_at', '=', $cursorTs)
-                            ->where('dlm.id', '<', $cursorId);
-                    });
-            });
+            $this->applyCursor($builder, $query->cursor);
         }
 
-        /** @var Collection<int, object> $rows */
-        $rows = $builder
-            ->orderByDesc('dlm.dead_lettered_at')
-            ->orderByDesc('dlm.id')
-            ->limit($fetchLimit)
-            ->get();
-
-        $hasMore = $rows->count() > $query->limit;
-        $pageRows = $rows->take($query->limit);
-
-        $nextCursor = null;
-        if ($hasMore && $pageRows->isNotEmpty()) {
-            $last = $pageRows->last();
-            $deadAt = $this->requireImmutable($last->dead_lettered_at);
-            $nextCursor = $deadAt->format(\DateTimeInterface::ATOM) . '|' . (string) $last->id;
-        }
-
-        $entries = $pageRows
-            ->map(fn (object $row): DlqEntry => $this->toDlqEntry($row))
-            ->values()
-            ->all();
-
-        return new DlqEntryPage($entries, $nextCursor);
+        return $builder;
     }
 
-    /**
-     * @return array{0: DateTimeImmutable, 1: string}
-     */
-    private function decodeCursor(string $cursor): array
+    private function applyCursor(Builder $builder, string $cursor): void
     {
-        $parts = explode('|', $cursor, 2);
-
-        if (\count($parts) !== 2 || $parts[1] === '') {
-            throw new \InvalidArgumentException('Malformed DLQ list cursor.');
+        $decoded = base64_decode($cursor, strict: true);
+        if ($decoded === false) {
+            // Malformed cursor — degrade gracefully by ignoring it.
+            return;
         }
 
-        return [new DateTimeImmutable($parts[0]), $parts[1]];
+        $parts = explode('|', $decoded, 2);
+        if (count($parts) !== 2) {
+            return;
+        }
+
+        [$deadLetteredAt, $id] = $parts;
+
+        // Keyset: rows strictly older than the cursor, or same timestamp with
+        // a lexicographically smaller id (DESC sort tiebreaker).
+        $builder->where(static function (Builder $q) use ($deadLetteredAt, $id): void {
+            $q->where('dlm.dead_lettered_at', '<', $deadLetteredAt)
+              ->orWhere(static function (Builder $q2) use ($deadLetteredAt, $id): void {
+                  $q2->where('dlm.dead_lettered_at', $deadLetteredAt)
+                     ->where('dlm.id', '<', $id);
+              });
+        });
     }
 
-    private function toDlqEntry(object $row): DlqEntry
+    private function encodeCursor(DlqEntry $last): string
+    {
+        $payload = $last->deadLetteredAt
+            ->setTimezone(new DateTimeZone('UTC'))
+            ->format('Y-m-d H:i:s')
+            . '|'
+            . $last->id;
+
+        return base64_encode($payload);
+    }
+
+    private function project(object $row): DlqEntry
     {
         return new DlqEntry(
-            id: (string) $row->id,
-            notificationId: (string) $row->notification_id,
-            reason: (string) $row->reason,
-            channel: Channel::from((string) $row->channel),
-            deadLetteredAt: $this->requireImmutable($row->dead_lettered_at),
-            finalAttemptAt: $this->toImmutable($row->final_attempt_at ?? null),
-            replayNotificationId: $row->replay_notification_id !== null ? (string) $row->replay_notification_id : null,
-            replayedAt: $this->toImmutable($row->replayed_at ?? null),
+            id:                   $row->id,
+            notificationId:       $row->notification_id,
+            reason:               $row->reason,
+            channel:              Channel::from($row->channel),
+            deadLetteredAt:       $this->toUtc($row->dead_lettered_at),
+            finalAttemptAt:       $row->final_attempt_at !== null
+                                      ? $this->toUtc($row->final_attempt_at)
+                                      : null,
+            replayNotificationId: $row->replay_notification_id,
+            replayedAt:           $row->replayed_at !== null
+                                      ? $this->toUtc($row->replayed_at)
+                                      : null,
         );
     }
 
-    private function requireImmutable(mixed $value): DateTimeImmutable
+    private function toUtc(string $raw): DateTimeImmutable
     {
-        $dt = $this->toImmutable($value);
-
-        if ($dt === null) {
-            throw new \RuntimeException('Expected a non-null timestamp for DLQ projection.');
-        }
-
-        return $dt;
-    }
-
-    private function toImmutable(mixed $value): ?DateTimeImmutable
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        if ($value instanceof DateTimeImmutable) {
-            return $value;
-        }
-
-        if ($value instanceof \DateTimeInterface) {
-            return DateTimeImmutable::createFromInterface($value);
-        }
-
-        return new DateTimeImmutable((string) $value);
+        return (new DateTimeImmutable($raw))->setTimezone(new DateTimeZone('UTC'));
     }
 }
