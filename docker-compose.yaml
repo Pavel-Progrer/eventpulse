@@ -53,7 +53,7 @@ services:
       - ./docker/php/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf:ro
       - composer_cache:/home/www-data/.composer/cache
     environment:
-      APP_ENV:   local
+      APP_ENV:   development
       APP_DEBUG: "true"
       XDEBUG_CONFIG: "client_host=host.docker.internal"
       PHP_IDE_CONFIG: "serverName=eventpulse"
