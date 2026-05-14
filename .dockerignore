@@ -1,0 +1,11 @@
+# Never send these to the Docker build context
+src/tests/
+src/storage/logs/*
+src/storage/framework/cache/*
+docker/
+docs/
+.github/
+*.md
+.env
+.env.*
+!.env.example
