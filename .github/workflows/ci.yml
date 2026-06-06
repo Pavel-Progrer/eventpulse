@@ -13,6 +13,19 @@ concurrency:
 env:
   PHP_VERSION: "8.4"
 
+# The Laravel application lives in `src/`, not at the repository root
+# (the root holds docker/, docker-compose.yaml, docs/, .github/).
+# `defaults.run.working-directory` makes every `run:` step execute from
+# inside src/ so composer.json, artisan and vendor/ are found.
+#
+# NOTE: this default applies ONLY to `run:` steps. It does NOT affect
+# `uses:` actions (actions/cache, codecov), whose path inputs are still
+# resolved relative to the workspace root — those are prefixed with `src/`
+# explicitly below.
+defaults:
+  run:
+    working-directory: src
+
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # test
@@ -61,8 +74,9 @@ jobs:
       - name: Cache Composer packages
         uses: actions/cache@v4
         with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
+          # Resolved from the workspace root (not affected by working-directory).
+          path: src/vendor
+          key: composer-${{ hashFiles('src/composer.lock') }}
           restore-keys: composer-
 
       - name: Install dependencies
@@ -100,7 +114,7 @@ jobs:
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
 
-      - name: Run feature & integration tests
+      - name: Run feature tests
         run: |
           php artisan test \
             --testsuite=Feature \
@@ -122,7 +136,8 @@ jobs:
         if: success()
         uses: codecov/codecov-action@v4
         with:
-          files: coverage.xml
+          # coverage.xml is written inside src/ by the test step above.
+          files: src/coverage.xml
           fail_ci_if_error: false   # don't block on upload failure; coverage is informational
 
   # ────────────────────────────────────────────────────────────────────────────
@@ -147,8 +162,8 @@ jobs:
       - name: Cache Composer packages
         uses: actions/cache@v4
         with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
+          path: src/vendor
+          key: composer-${{ hashFiles('src/composer.lock') }}
           restore-keys: composer-
 
       - name: Install dependencies
@@ -169,3 +184,4 @@ jobs:
       #
       # - name: PHPStan
       #   run: ./vendor/bin/phpstan analyse --no-progress --error-format=github
+      
