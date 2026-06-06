@@ -82,13 +82,6 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Debug — parallel prerequisites
-        run: |
-          composer show | grep -E 'brianium/paratest|nunomaduro/collision|phpunit/phpunit' || true
-          ls -l vendor/bin/paratest vendor/brianium/paratest/bin/paratest 2>&1 || true
-          php -r "require 'vendor/autoload.php'; var_dump(class_exists('ParaTest\\\\ParaTestCommand'));"
-          php artisan test --help 2>&1 | grep -i parallel || echo "no --parallel option in resolved test command"
-
       # Tests run with APP_ENV=testing (set in phpunit.xml), so Laravel loads
       # .env.testing. We seed it from the committed example; the hermetic
       # settings (QUEUE_CONNECTION=sync, CACHE_STORE=array, MAIL_MAILER=array)
@@ -114,8 +107,8 @@ jobs:
       - name: Run unit tests (no DB, no Laravel bootstrap)
         run: |
           php artisan test \
-            --testsuite=Unit \
             --parallel \
+            --testsuite=Domain \
             --stop-on-failure
         env:
           DB_CONNECTION: pgsql
@@ -130,8 +123,8 @@ jobs:
       - name: Run feature tests
         run: |
           php artisan test \
-            --testsuite=Feature \
             --parallel \
+            --testsuite=Feature \
             --stop-on-failure \
             --coverage-clover coverage.xml
         env:
