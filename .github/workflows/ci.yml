@@ -114,8 +114,8 @@ jobs:
       - name: Run unit tests (no DB, no Laravel bootstrap)
         run: |
           php artisan test \
-            --testsuite=Unit \
             --parallel \
+            --testsuite=Domain \
             --stop-on-failure
         env:
           DB_CONNECTION: pgsql
@@ -130,8 +130,8 @@ jobs:
       - name: Run feature tests
         run: |
           php artisan test \
-            --testsuite=Feature \
             --parallel \
+            --testsuite=Feature \
             --stop-on-failure \
             --coverage-clover coverage.xml
         env:
