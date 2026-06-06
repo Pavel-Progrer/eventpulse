@@ -82,21 +82,27 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Copy .env.ci
-        run: cp .env.ci .env
+      # Tests run with APP_ENV=testing (set in phpunit.xml), so Laravel loads
+      # .env.testing. We seed it from the committed example; the hermetic
+      # settings (QUEUE_CONNECTION=sync, CACHE_STORE=array, MAIL_MAILER=array)
+      # live in that file, so no external side effects occur during the run.
+      - name: Create test environment file
+        run: cp .env.testing.example .env.testing
 
       - name: Generate application key
-        run: php artisan key:generate --ansi
+        run: php artisan key:generate --env=testing --ansi
 
       - name: Run migrations
         env:
+          # Override the example's docker hostnames with the CI service-container
+          # addresses. Real env vars take precedence over the .env.testing values.
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: eventpulse_test
           DB_USERNAME: eventpulse
           DB_PASSWORD: secret
-        run: php artisan migrate --force --no-interaction
+        run: php artisan migrate --env=testing --force --no-interaction
 
       - name: Run unit tests (no DB, no Laravel bootstrap)
         run: |
@@ -130,7 +136,6 @@ jobs:
           DB_PASSWORD: secret
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-          MAIL_MAILER: log
 
       - name: Upload coverage
         if: success()
