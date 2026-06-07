@@ -48,7 +48,7 @@ final class DlqEntryPageResource extends JsonResource
         $page = $this->resource;
 
         return [
-            'data'       => array_map(
+            'data' => array_map(
                 static fn ($entry) => DlqEntryResource::make($entry)->toArray($request),
                 $page->entries,
             ),

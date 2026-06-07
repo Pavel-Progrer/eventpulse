@@ -10,6 +10,7 @@ use EventPulse\Application\WebhookDestination\Command\DisableWebhookDestinationC
 use EventPulse\Application\WebhookDestination\Command\DisableWebhookDestinationHandler;
 use EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationCommand;
 use EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationHandler;
+use EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationResult;
 use EventPulse\Domain\DomainEvent;
 use EventPulse\Domain\WebhookDestination\Enum\WebhookDestinationStatus;
 use EventPulse\Domain\WebhookDestination\Event\WebhookDestinationDisabled;
@@ -34,33 +35,39 @@ use PHPUnit\Framework\TestCase;
  */
 final class DisableWebhookDestinationHandlerTest extends TestCase
 {
-    private const string API_KEY_ID    = 'ak-test-0000-0001';
-    private const string OTHER_KEY_ID  = 'ak-test-0000-0002';
-    private const string URL           = 'https://receiver.example.com/hook';
-    private const string SECRET        = 'super-secret-passphrase-32-chars!';
+    private const string API_KEY_ID = 'ak-test-0000-0001';
+
+    private const string OTHER_KEY_ID = 'ak-test-0000-0002';
+
+    private const string URL = 'https://receiver.example.com/hook';
+
+    private const string SECRET = 'super-secret-passphrase-32-chars!';
 
     private InMemoryWebhookDestinationRepository $repository;
+
     private SpyEventDispatcher $eventDispatcher;
+
     private DisableWebhookDestinationHandler $handler;
+
     private RegisterWebhookDestinationHandler $registerHandler;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $clock                 = new FixedClock(new DateTimeImmutable('2026-04-28T12:00:00Z'));
-        $this->repository      = new InMemoryWebhookDestinationRepository();
-        $this->eventDispatcher = new SpyEventDispatcher();
+        $clock = new FixedClock(new DateTimeImmutable('2026-04-28T12:00:00Z'));
+        $this->repository = new InMemoryWebhookDestinationRepository;
+        $this->eventDispatcher = new SpyEventDispatcher;
 
         $this->handler = new DisableWebhookDestinationHandler(
-            repository:      $this->repository,
-            clock:           $clock,
+            repository: $this->repository,
+            clock: $clock,
             eventDispatcher: $this->eventDispatcher,
         );
 
         $this->registerHandler = new RegisterWebhookDestinationHandler(
-            repository:      $this->repository,
-            clock:           $clock,
+            repository: $this->repository,
+            clock: $clock,
             eventDispatcher: $this->eventDispatcher,
         );
     }
@@ -74,7 +81,7 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
 
         ($this->handler)(new DisableWebhookDestinationCommand(
             destinationId: $result->id->toString(),
-            apiKeyId:      self::API_KEY_ID,
+            apiKeyId: self::API_KEY_ID,
             correlationId: 'corr-disable-001',
         ));
 
@@ -94,7 +101,7 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
 
         ($this->handler)(new DisableWebhookDestinationCommand(
             destinationId: $result->id->toString(),
-            apiKeyId:      self::API_KEY_ID,
+            apiKeyId: self::API_KEY_ID,
             correlationId: 'corr-disable-002',
         ));
 
@@ -116,7 +123,7 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
 
         ($this->handler)(new DisableWebhookDestinationCommand(
             destinationId: '00000000-0000-4000-8000-000000000000',
-            apiKeyId:      self::API_KEY_ID,
+            apiKeyId: self::API_KEY_ID,
             correlationId: 'corr-notfound',
         ));
     }
@@ -132,7 +139,7 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
 
         ($this->handler)(new DisableWebhookDestinationCommand(
             destinationId: $result->id->toString(),
-            apiKeyId:      self::OTHER_KEY_ID,
+            apiKeyId: self::OTHER_KEY_ID,
             correlationId: 'corr-wrong-tenant',
         ));
     }
@@ -145,7 +152,7 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
         // First disable.
         ($this->handler)(new DisableWebhookDestinationCommand(
             destinationId: $result->id->toString(),
-            apiKeyId:      self::API_KEY_ID,
+            apiKeyId: self::API_KEY_ID,
             correlationId: 'corr-first-disable',
         ));
 
@@ -154,7 +161,7 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
 
         ($this->handler)(new DisableWebhookDestinationCommand(
             destinationId: $result->id->toString(),
-            apiKeyId:      self::API_KEY_ID,
+            apiKeyId: self::API_KEY_ID,
             correlationId: 'corr-second-disable',
         ));
     }
@@ -163,13 +170,13 @@ final class DisableWebhookDestinationHandlerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private function registerDestination(): \EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationResult
+    private function registerDestination(): RegisterWebhookDestinationResult
     {
         return ($this->registerHandler)(new RegisterWebhookDestinationCommand(
-            apiKeyId:      self::API_KEY_ID,
-            url:           self::URL,
-            secret:        self::SECRET,
-            name:          'Test destination',
+            apiKeyId: self::API_KEY_ID,
+            url: self::URL,
+            secret: self::SECRET,
+            name: 'Test destination',
             correlationId: 'corr-register-001',
         ));
     }

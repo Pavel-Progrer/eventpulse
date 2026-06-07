@@ -59,8 +59,10 @@ use Symfony\Component\HttpFoundation\Response;
 final class ThrottleApiRequests
 {
     private const int DEFAULT_WRITE_LIMIT = 100;
-    private const int DEFAULT_READ_LIMIT  = 600;
-    private const int WINDOW_SECONDS      = 60;
+
+    private const int DEFAULT_READ_LIMIT = 600;
+
+    private const int WINDOW_SECONDS = 60;
 
     public function __construct(
         private readonly RateLimiter $limiter,
@@ -80,26 +82,26 @@ final class ThrottleApiRequests
         }
 
         $isWrite = $this->isWriteRequest($request);
-        $limit   = $this->resolveLimit($apiKey, $isWrite);
-        $key     = $this->bucketKey($apiKey->id, $isWrite);
-        $window  = (int) (floor(now()->timestamp / self::WINDOW_SECONDS) + 1) * self::WINDOW_SECONDS;
+        $limit = $this->resolveLimit($apiKey, $isWrite);
+        $key = $this->bucketKey($apiKey->id, $isWrite);
+        $window = (int) (floor(now()->timestamp / self::WINDOW_SECONDS) + 1) * self::WINDOW_SECONDS;
 
         if ($this->limiter->tooManyAttempts($key, $limit)) {
             $retryAfter = $this->limiter->availableIn($key);
 
             return $this->tooManyRequests(
-                limit:       $limit,
-                remaining:   0,
-                resetAt:     $window,
-                retryAfter:  $retryAfter,
+                limit: $limit,
+                remaining: 0,
+                resetAt: $window,
+                retryAfter: $retryAfter,
                 correlationId: $request->header('X-Correlation-ID'),
             );
         }
 
         $this->limiter->hit($key, self::WINDOW_SECONDS);
 
-        $attempts   = $this->limiter->attempts($key);
-        $remaining  = max(0, $limit - $attempts);
+        $attempts = $this->limiter->attempts($key);
+        $remaining = max(0, $limit - $attempts);
 
         /** @var Response $response */
         $response = $next($request);
@@ -139,15 +141,15 @@ final class ThrottleApiRequests
 
     private function addRateLimitHeaders(Response $response, int $limit, int $remaining, int $resetAt): Response
     {
-        $response->headers->set('X-RateLimit-Limit',     (string) $limit);
+        $response->headers->set('X-RateLimit-Limit', (string) $limit);
         $response->headers->set('X-RateLimit-Remaining', (string) $remaining);
-        $response->headers->set('X-RateLimit-Reset',     (string) $resetAt);
+        $response->headers->set('X-RateLimit-Reset', (string) $resetAt);
 
         return $response;
     }
 
     /**
-     * @param string|string[]|null $correlationId
+     * @param  string|string[]|null  $correlationId
      */
     private function tooManyRequests(
         int $limit,
@@ -158,10 +160,10 @@ final class ThrottleApiRequests
     ): JsonResponse {
         $payload = [
             'error' => [
-                'code'    => 'RATE_LIMITED',
+                'code' => 'RATE_LIMITED',
                 'message' => 'You have exceeded the rate limit. Please slow down.',
                 'details' => [
-                    'limit'       => $limit,
+                    'limit' => $limit,
                     'retry_after' => $retryAfter,
                 ],
             ],
@@ -172,10 +174,10 @@ final class ThrottleApiRequests
         }
 
         return new JsonResponse($payload, Response::HTTP_TOO_MANY_REQUESTS, [
-            'Retry-After'           => (string) $retryAfter,
-            'X-RateLimit-Limit'     => (string) $limit,
+            'Retry-After' => (string) $retryAfter,
+            'X-RateLimit-Limit' => (string) $limit,
             'X-RateLimit-Remaining' => (string) $remaining,
-            'X-RateLimit-Reset'     => (string) $resetAt,
+            'X-RateLimit-Reset' => (string) $resetAt,
         ]);
     }
 }

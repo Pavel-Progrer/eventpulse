@@ -63,7 +63,7 @@ final class InMemoryNotificationRepository implements NotificationRepository
     public function markDiscarded(NotificationId $id, DateTimeImmutable $at): void
     {
         // Idempotent — matches the Eloquent implementation's whereNull guard.
-        if (!isset($this->discarded[$id->toString()])) {
+        if (! isset($this->discarded[$id->toString()])) {
             $this->discarded[$id->toString()] = $at;
         }
     }

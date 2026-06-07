@@ -139,18 +139,18 @@ final class ListNotificationsQueryHandler
         // same instant but with a lexicographically smaller UUID (DESC order).
         $builder->where(static function (Builder $q) use ($createdAt, $id): void {
             $q->where('created_at', '<', $createdAt)
-              ->orWhere(static function (Builder $q2) use ($createdAt, $id): void {
-                  $q2->where('created_at', $createdAt)
-                     ->where('id', '<', $id);
-              });
+                ->orWhere(static function (Builder $q2) use ($createdAt, $id): void {
+                    $q2->where('created_at', $createdAt)
+                        ->where('id', '<', $id);
+                });
         });
     }
 
     private function encodeCursor(Notification $last): string
     {
         $payload = $last->createdAt()->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s')
-            . '|'
-            . $last->id()->toString();
+            .'|'
+            .$last->id()->toString();
 
         return base64_encode($payload);
     }
@@ -175,24 +175,24 @@ final class ListNotificationsQueryHandler
         $channel = Channel::from($row->channel);
 
         return Notification::reconstitute(
-            id:             NotificationId::fromString($row->id),
-            channel:        $channel,
-            recipient:      match ($channel) {
-                Channel::Email   => EmailRecipient::fromString($row->recipient),
-                Channel::Sms     => SmsRecipient::fromE164($row->recipient),
+            id: NotificationId::fromString($row->id),
+            channel: $channel,
+            recipient: match ($channel) {
+                Channel::Email => EmailRecipient::fromString($row->recipient),
+                Channel::Sms => SmsRecipient::fromE164($row->recipient),
                 Channel::Webhook => WebhookRecipient::fromDestinationId($row->recipient),
             },
-            payload:        NotificationPayload::forChannel($row->payload, $channel),
-            priority:       Priority::from($row->priority),
+            payload: NotificationPayload::forChannel($row->payload, $channel),
+            priority: Priority::from($row->priority),
             idempotencyKey: IdempotencyKey::fromString($row->idempotency_key),
-            apiKeyId:       $row->api_key_id,
-            createdAt:      DateTimeImmutable::createFromInterface($row->created_at)
-                                ->setTimezone(new DateTimeZone('UTC')),
-            status:         NotificationStatus::from($row->status),
-            correlationId:  CorrelationId::fromString($row->correlation_id),
-            attempts:       [],  // not loaded in list path — spec §4.1 does not include attempt history
+            apiKeyId: $row->api_key_id,
+            createdAt: DateTimeImmutable::createFromInterface($row->created_at)
+                ->setTimezone(new DateTimeZone('UTC')),
+            status: NotificationStatus::from($row->status),
+            correlationId: CorrelationId::fromString($row->correlation_id),
+            attempts: [],  // not loaded in list path — spec §4.1 does not include attempt history
             deadLetterMark: null,
-            replayOf:       $row->replay_of_id === null
+            replayOf: $row->replay_of_id === null
                 ? null
                 : NotificationId::fromString($row->replay_of_id),
         );

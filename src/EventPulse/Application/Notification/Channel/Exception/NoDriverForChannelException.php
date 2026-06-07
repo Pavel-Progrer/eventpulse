@@ -23,7 +23,7 @@ final class NoDriverForChannelException extends \RuntimeException
     {
         parent::__construct(sprintf(
             'No ChannelDriver registered for channel "%s". '
-            . 'Register an implementation in EventPulseServiceProvider::registerChannelDispatcher().',
+            .'Register an implementation in EventPulseServiceProvider::registerChannelDispatcher().',
             $channel->value,
         ));
     }

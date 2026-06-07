@@ -21,11 +21,11 @@ final class WebhookRecipient extends Recipient
     ) {}
 
     /**
-     * @param string $destinationId UUID of the target WebhookDestination.
+     * @param  string  $destinationId  UUID of the target WebhookDestination.
      */
     public static function fromDestinationId(string $destinationId): self
     {
-        if (!self::isValidUuid($destinationId)) {
+        if (! self::isValidUuid($destinationId)) {
             throw new InvalidNotificationInputException(
                 sprintf('"%s" is not a valid WebhookDestination id.', $destinationId)
             );

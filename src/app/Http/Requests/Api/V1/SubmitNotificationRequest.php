@@ -52,10 +52,10 @@ final class SubmitNotificationRequest extends FormRequest
         ];
 
         $bodyRules = [
-            'channel'    => ['required', 'string', Rule::in(['email', 'webhook', 'sms'])],
-            'recipient'  => ['required', 'string', 'min:1', 'max:320'],
-            'priority'   => ['nullable', 'string', Rule::in(['low', 'normal', 'high'])],
-            'payload'    => ['required', 'array'],
+            'channel' => ['required', 'string', Rule::in(['email', 'webhook', 'sms'])],
+            'recipient' => ['required', 'string', 'min:1', 'max:320'],
+            'priority' => ['nullable', 'string', Rule::in(['low', 'normal', 'high'])],
+            'payload' => ['required', 'array'],
         ];
 
         $channel = $this->input('channel');
@@ -66,13 +66,13 @@ final class SubmitNotificationRequest extends FormRequest
         // generic "InvalidArgumentException" from the domain.
         $payloadRules = match ($channel) {
             'email' => [
-                'payload.subject'   => ['required', 'string', 'min:1', 'max:998'],
+                'payload.subject' => ['required', 'string', 'min:1', 'max:998'],
                 'payload.body_text' => ['nullable', 'string', 'max:524288'],
                 'payload.body_html' => ['nullable', 'string', 'max:524288'],
-                'payload.reply_to'  => ['nullable', 'email:rfc'],
+                'payload.reply_to' => ['nullable', 'email:rfc'],
             ],
             'webhook' => [
-                'payload.body'    => ['required', 'array'],
+                'payload.body' => ['required', 'array'],
                 'payload.headers' => ['nullable', 'array'],
             ],
             'sms' => [
@@ -95,7 +95,7 @@ final class SubmitNotificationRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'Idempotency-Key'  => $this->header('Idempotency-Key'),
+            'Idempotency-Key' => $this->header('Idempotency-Key'),
             'X-Correlation-ID' => $this->header('X-Correlation-ID'),
         ]);
     }
@@ -117,7 +117,7 @@ final class SubmitNotificationRequest extends FormRequest
             $hasHtml = is_string($this->input('payload.body_html'))
                 && $this->input('payload.body_html') !== '';
 
-            if (!$hasText && !$hasHtml) {
+            if (! $hasText && ! $hasHtml) {
                 $v->errors()->add(
                     'payload',
                     'Email payload must include at least one of "body_text" or "body_html".',
@@ -135,7 +135,7 @@ final class SubmitNotificationRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'Idempotency-Key'  => 'Idempotency-Key header',
+            'Idempotency-Key' => 'Idempotency-Key header',
             'X-Correlation-ID' => 'X-Correlation-ID header',
             'payload.body_text' => 'payload.body_text',
             'payload.body_html' => 'payload.body_html',

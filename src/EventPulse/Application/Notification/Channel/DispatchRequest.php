@@ -67,11 +67,11 @@ final readonly class DispatchRequest
     {
         return new self(
             notificationId: $notification->id(),
-            channel:        $notification->channel(),
-            recipient:      $notification->recipient(),
-            payload:        $notification->payload(),
-            correlationId:  $notification->correlationId(),
-            attemptNumber:  $attempt->number(),
+            channel: $notification->channel(),
+            recipient: $notification->recipient(),
+            payload: $notification->payload(),
+            correlationId: $notification->correlationId(),
+            attemptNumber: $attempt->number(),
         );
     }
 }

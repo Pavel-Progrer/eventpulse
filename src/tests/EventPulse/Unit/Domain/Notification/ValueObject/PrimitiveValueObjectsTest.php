@@ -37,7 +37,7 @@ final class PrimitiveValueObjectsTest extends TestCase
     public function test_idempotency_key_accepts_255_characters(): void
     {
         $value = str_repeat('a', 255);
-        $key   = IdempotencyKey::fromString($value);
+        $key = IdempotencyKey::fromString($value);
         self::assertSame($value, $key->toString());
     }
 
@@ -154,9 +154,9 @@ final class PrimitiveValueObjectsTest extends TestCase
 
     public function test_next_increments_by_one(): void
     {
-        $first  = AttemptNumber::first();
+        $first = AttemptNumber::first();
         $second = $first->next();
-        $third  = $second->next();
+        $third = $second->next();
 
         self::assertSame(1, $first->toInt());
         self::assertSame(2, $second->toInt());
@@ -165,7 +165,7 @@ final class PrimitiveValueObjectsTest extends TestCase
 
     public function test_next_returns_a_new_instance(): void
     {
-        $first  = AttemptNumber::first();
+        $first = AttemptNumber::first();
         $second = $first->next();
 
         self::assertSame(1, $first->toInt());
@@ -205,7 +205,7 @@ final class PrimitiveValueObjectsTest extends TestCase
     public function test_notification_id_from_string_accepts_valid_uuid(): void
     {
         $uuid = '550e8400-e29b-4d00-a716-446655440000';
-        $id   = NotificationId::fromString($uuid);
+        $id = NotificationId::fromString($uuid);
         self::assertSame($uuid, $id->toString());
         self::assertSame($uuid, (string) $id);
     }
@@ -225,9 +225,9 @@ final class PrimitiveValueObjectsTest extends TestCase
     public function test_notification_id_equality(): void
     {
         $uuid = '550e8400-e29b-4d00-a716-446655440000';
-        $a    = NotificationId::fromString($uuid);
-        $b    = NotificationId::fromString($uuid);
-        $c    = NotificationId::generate();
+        $a = NotificationId::fromString($uuid);
+        $b = NotificationId::fromString($uuid);
+        $c = NotificationId::generate();
 
         self::assertTrue($a->equals($b));
         self::assertFalse($a->equals($c));

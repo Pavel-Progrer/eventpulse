@@ -36,11 +36,12 @@ use Tests\Integration\Notification\Channel\Doubles\RecordingLogger;
 final class SmsChannelDriverTest extends TestCase
 {
     private RecordingLogger $logger;
+
     private SmsChannelDriver $driver;
 
     protected function setUp(): void
     {
-        $this->logger = new RecordingLogger();
+        $this->logger = new RecordingLogger;
         $this->driver = new SmsChannelDriver(logger: $this->logger);
     }
 
@@ -88,11 +89,11 @@ final class SmsChannelDriverTest extends TestCase
     {
         $request = new DispatchRequest(
             notificationId: NotificationId::generate(),
-            channel:        Channel::Sms,
-            recipient:      EmailRecipient::fromString('user@example.com'),
-            payload:        NotificationPayload::forChannel(['body' => 'hi'], Channel::Sms),
-            correlationId:  CorrelationId::generate(),
-            attemptNumber:  AttemptNumber::first(),
+            channel: Channel::Sms,
+            recipient: EmailRecipient::fromString('user@example.com'),
+            payload: NotificationPayload::forChannel(['body' => 'hi'], Channel::Sms),
+            correlationId: CorrelationId::generate(),
+            attemptNumber: AttemptNumber::first(),
         );
 
         $this->expectException(LogicException::class);
@@ -104,11 +105,11 @@ final class SmsChannelDriverTest extends TestCase
     {
         return new DispatchRequest(
             notificationId: NotificationId::generate(),
-            channel:        Channel::Sms,
-            recipient:      SmsRecipient::fromE164('+15551234567'),
-            payload:        NotificationPayload::forChannel(['body' => 'Test SMS body'], Channel::Sms),
-            correlationId:  CorrelationId::generate(),
-            attemptNumber:  AttemptNumber::first(),
+            channel: Channel::Sms,
+            recipient: SmsRecipient::fromE164('+15551234567'),
+            payload: NotificationPayload::forChannel(['body' => 'Test SMS body'], Channel::Sms),
+            correlationId: CorrelationId::generate(),
+            attemptNumber: AttemptNumber::first(),
         );
     }
 }

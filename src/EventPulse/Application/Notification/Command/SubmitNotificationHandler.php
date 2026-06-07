@@ -64,8 +64,8 @@ final class SubmitNotificationHandler
     public function __invoke(SubmitNotificationCommand $command): SubmitNotificationResult
     {
         $idempotencyKey = IdempotencyKey::fromString($command->idempotencyKey);
-        $recipient      = $this->resolveRecipient($command->channel, $command->recipient);
-        $payload        = NotificationPayload::forChannel($command->payload, $command->channel);
+        $recipient = $this->resolveRecipient($command->channel, $command->recipient);
+        $payload = NotificationPayload::forChannel($command->payload, $command->channel);
 
         // Dedup runs *before* identifier generation, so a replay never
         // accidentally creates a fresh aggregate.
@@ -95,15 +95,15 @@ final class SubmitNotificationHandler
             : CorrelationId::fromString($command->correlationId);
 
         $notification = Notification::request(
-            id:             NotificationId::generate(),
-            channel:        $command->channel,
-            recipient:      $recipient,
-            rawPayload:     $command->payload,
-            priority:       $command->priority,
+            id: NotificationId::generate(),
+            channel: $command->channel,
+            recipient: $recipient,
+            rawPayload: $command->payload,
+            priority: $command->priority,
             idempotencyKey: $idempotencyKey,
-            apiKeyId:       $command->apiKeyId,
-            correlationId:  $correlationId,
-            now:            $this->clock->now(),
+            apiKeyId: $command->apiKeyId,
+            correlationId: $correlationId,
+            now: $this->clock->now(),
         );
 
         $this->repository->save($notification);
@@ -120,8 +120,8 @@ final class SubmitNotificationHandler
         // this up in `DispatchNotificationJob`.
         $this->dispatchQueue->enqueue(
             notificationId: $notification->id(),
-            correlationId:  $notification->correlationId(),
-            priority:       $notification->priority(),
+            correlationId: $notification->correlationId(),
+            priority: $notification->priority(),
         );
 
         return SubmitNotificationResult::accepted($notification);
@@ -151,9 +151,9 @@ final class SubmitNotificationHandler
             $command->priority,
         );
 
-        if (!$matches) {
+        if (! $matches) {
             throw new IdempotencyConflictException(
-                apiKeyId:       $command->apiKeyId,
+                apiKeyId: $command->apiKeyId,
                 idempotencyKey: $existing->idempotencyKey(),
             );
         }
@@ -174,8 +174,8 @@ final class SubmitNotificationHandler
     private function resolveRecipient(Channel $channel, string $raw): Recipient
     {
         return match ($channel) {
-            Channel::Email   => EmailRecipient::fromString($raw),
-            Channel::Sms     => SmsRecipient::fromE164($raw),
+            Channel::Email => EmailRecipient::fromString($raw),
+            Channel::Sms => SmsRecipient::fromE164($raw),
             Channel::Webhook => WebhookRecipient::fromDestinationId($raw),
         };
     }

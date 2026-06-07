@@ -55,9 +55,9 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
     {
         [$level, $context] = $this->render($event);
 
-        $context['event']          = $event->eventName();
+        $context['event'] = $event->eventName();
         $context['correlation_id'] = $event->correlationId()->toString();
-        $context['occurred_at']    = $event->occurredAt()->format(\DateTimeInterface::ATOM);
+        $context['occurred_at'] = $event->occurredAt()->format(\DateTimeInterface::ATOM);
 
         $this->logger->log($level, $event->eventName(), $context);
     }
@@ -74,10 +74,10 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'info',
                 [
                     'notification_id' => $event->notificationId()->toString(),
-                    'channel'         => $event->channel()->value,
-                    'priority'        => $event->priority()->value,
+                    'channel' => $event->channel()->value,
+                    'priority' => $event->priority()->value,
                     'idempotency_key' => $event->idempotencyKey()->toString(),
-                    'recipient'       => $event->recipient()->toString(),
+                    'recipient' => $event->recipient()->toString(),
                 ],
             ],
 
@@ -85,14 +85,14 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'info',
                 [
                     'notification_id' => $event->notificationId()->toString(),
-                    'attempt_number'  => $event->attemptNumber()->toInt(),
+                    'attempt_number' => $event->attemptNumber()->toInt(),
                 ],
             ],
 
             $event instanceof NotificationDispatched => [
                 'info',
                 [
-                    'notification_id'      => $event->notificationId()->toString(),
+                    'notification_id' => $event->notificationId()->toString(),
                     'succeeded_on_attempt' => $event->succeededOnAttempt()->toInt(),
                 ],
             ],
@@ -101,19 +101,19 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'warning',
                 [
                     'notification_id' => $event->notificationId()->toString(),
-                    'attempt_number'  => $event->attemptNumber()->toInt(),
-                    'classification'  => $event->classification()->value,
-                    'reason'          => $event->reason(),
+                    'attempt_number' => $event->attemptNumber()->toInt(),
+                    'classification' => $event->classification()->value,
+                    'reason' => $event->reason(),
                 ],
             ],
 
             $event instanceof NotificationScheduledForRetry => [
                 'info',
                 [
-                    'notification_id'       => $event->notificationId()->toString(),
+                    'notification_id' => $event->notificationId()->toString(),
                     'failed_attempt_number' => $event->failedAttemptNumber()->toInt(),
-                    'next_attempt_number'   => $event->nextAttemptNumber()->toInt(),
-                    'retry_after'           => $event->retryAfter()->format(\DateTimeInterface::ATOM),
+                    'next_attempt_number' => $event->nextAttemptNumber()->toInt(),
+                    'retry_after' => $event->retryAfter()->format(\DateTimeInterface::ATOM),
                 ],
             ],
 
@@ -121,8 +121,8 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'error',
                 [
                     'notification_id' => $event->notificationId()->toString(),
-                    'total_attempts'  => $event->totalAttempts()->toInt(),
-                    'reason'          => $event->reason(),
+                    'total_attempts' => $event->totalAttempts()->toInt(),
+                    'reason' => $event->reason(),
                 ],
             ],
 
@@ -130,7 +130,7 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'info',
                 [
                     'original_notification_id' => $event->originalNotificationId()->toString(),
-                    'replay_notification_id'   => $event->replayNotificationId()->toString(),
+                    'replay_notification_id' => $event->replayNotificationId()->toString(),
                 ],
             ],
 
@@ -142,9 +142,9 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'info',
                 [
                     'destination_id' => $event->destinationId()->toString(),
-                    'api_key_id'     => $event->apiKeyId(),
-                    'url'            => $event->url(),
-                    'name'           => $event->name(),
+                    'api_key_id' => $event->apiKeyId(),
+                    'url' => $event->url(),
+                    'name' => $event->name(),
                 ],
             ],
 
@@ -155,7 +155,7 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
                 'warning',
                 [
                     'destination_id' => $event->destinationId()->toString(),
-                    'api_key_id'     => $event->apiKeyId(),
+                    'api_key_id' => $event->apiKeyId(),
                 ],
             ],
 
@@ -164,7 +164,7 @@ final class StructuredLogDomainEventDispatcher implements DomainEventDispatcher
             // missing log entries in production.
             default => throw new \LogicException(sprintf(
                 'StructuredLogDomainEventDispatcher has no render branch for event class "%s". '
-                . 'Add a match arm in render().',
+                .'Add a match arm in render().',
                 $event::class,
             )),
         };

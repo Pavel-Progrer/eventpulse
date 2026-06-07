@@ -16,7 +16,7 @@ use EventPulse\Domain\WebhookDestination\Aggregate\WebhookDestination;
 final readonly class ListWebhookDestinationsResult
 {
     /**
-     * @param WebhookDestination[] $destinations
+     * @param  WebhookDestination[]  $destinations
      */
     public function __construct(
         public array $destinations,

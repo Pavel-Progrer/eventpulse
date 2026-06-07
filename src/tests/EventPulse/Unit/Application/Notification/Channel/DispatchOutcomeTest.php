@@ -45,7 +45,7 @@ final class DispatchOutcomeTest extends TestCase
     {
         $outcome = DispatchOutcome::failure(
             classification: FailureClassification::Transient,
-            reason:         'connection timeout after 30s',
+            reason: 'connection timeout after 30s',
         );
 
         self::assertFalse($outcome->succeeded);
@@ -63,7 +63,7 @@ final class DispatchOutcomeTest extends TestCase
 
         DispatchOutcome::failure(
             classification: FailureClassification::Permanent,
-            reason:         '',
+            reason: '',
         );
     }
 

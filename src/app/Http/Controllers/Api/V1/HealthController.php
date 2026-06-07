@@ -51,7 +51,7 @@ final class HealthController
 {
     public function __construct(
         private readonly ConnectionInterface $db,
-        private readonly Cache        $cache,
+        private readonly Cache $cache,
         private readonly QueueManager $queue,
     ) {}
 
@@ -75,14 +75,14 @@ final class HealthController
     public function readiness(Request $request): JsonResponse
     {
         $checks = [
-            'database'    => $this->checkDatabase(),
-            'redis'       => $this->checkRedis(),
+            'database' => $this->checkDatabase(),
+            'redis' => $this->checkRedis(),
             'queue_depth' => $this->checkQueueDepth(),
         ];
 
         $allOk = array_reduce(
             $checks,
-            static fn(bool $carry, array $check): bool => $carry && $check['status'] === 'ok',
+            static fn (bool $carry, array $check): bool => $carry && $check['status'] === 'ok',
             true,
         );
 
@@ -106,13 +106,13 @@ final class HealthController
             $this->db->selectOne('SELECT 1');
 
             return [
-                'status'     => 'ok',
+                'status' => 'ok',
                 'latency_ms' => $this->elapsedMs($start),
             ];
         } catch (Throwable $e) {
             return [
                 'status' => 'fail',
-                'error'  => 'Database check failed: ' . $e->getMessage(),
+                'error' => 'Database check failed: '.$e->getMessage(),
             ];
         }
     }
@@ -128,18 +128,18 @@ final class HealthController
             // A lightweight ping: write a short-lived key and immediately
             // read it back. Tests both write and read path on the cache
             // connection, which is Redis in production.
-            $probe = 'eventpulse:health:' . uniqid('', true);
+            $probe = 'eventpulse:health:'.uniqid('', true);
             $this->cache->put($probe, 'ping', 5);
             $this->cache->forget($probe);
 
             return [
-                'status'     => 'ok',
+                'status' => 'ok',
                 'latency_ms' => $this->elapsedMs($start),
             ];
         } catch (Throwable $e) {
             return [
                 'status' => 'fail',
-                'error'  => 'Redis check failed: ' . $e->getMessage(),
+                'error' => 'Redis check failed: '.$e->getMessage(),
             ];
         }
     }
@@ -159,13 +159,13 @@ final class HealthController
             $pending = $this->queue->size(config('queue.connections.redis.queue', 'default'));
 
             return [
-                'status'  => 'ok',
+                'status' => 'ok',
                 'pending' => $pending,
             ];
         } catch (Throwable $e) {
             return [
                 'status' => 'fail',
-                'error'  => 'Queue depth check failed: ' . $e->getMessage(),
+                'error' => 'Queue depth check failed: '.$e->getMessage(),
             ];
         }
     }

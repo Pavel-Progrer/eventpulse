@@ -34,7 +34,8 @@ use Illuminate\Support\Facades\Schema;
  * not yet exist when the mark is first inserted; the value is nullable and
  * populated when an operator triggers replay.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('dead_letter_marks', function (Blueprint $table): void {
@@ -68,13 +69,13 @@ return new class extends Migration {
         // or both null (not replayed). A half-populated row would mean
         // operator-tooling drift and is rejected at the DB level.
         Schema::getConnection()->statement(
-            "ALTER TABLE dead_letter_marks
+            'ALTER TABLE dead_letter_marks
                 ADD CONSTRAINT dead_letter_marks_replay_consistency_check
                 CHECK (
                     (replay_notification_id IS NULL AND replayed_at IS NULL)
                     OR
                     (replay_notification_id IS NOT NULL AND replayed_at IS NOT NULL)
-                )"
+                )'
         );
     }
 

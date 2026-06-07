@@ -36,7 +36,7 @@ final class PaginatedWebhookDestinationsResource extends JsonResource
 
         return [
             'data' => array_map(
-                fn($d): array => (new WebhookDestinationResource($d))->toArray($request),
+                fn ($d): array => (new WebhookDestinationResource($d))->toArray($request),
                 $result->destinations,
             ),
             'meta' => [

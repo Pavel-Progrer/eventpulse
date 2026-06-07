@@ -41,9 +41,9 @@ final class ReplayDlqController
 
         $notification = ($this->handler)(new ReplayDeadLetteredCommand(
             notificationId: $id,
-            apiKeyId:       (string) $apiKey->id,
+            apiKeyId: (string) $apiKey->id,
             idempotencyKey: (string) $request->header('Idempotency-Key'),
-            correlationId:  $request->header('X-Correlation-ID'),
+            correlationId: $request->header('X-Correlation-ID'),
         ));
 
         $response = NotificationResource::make($notification)

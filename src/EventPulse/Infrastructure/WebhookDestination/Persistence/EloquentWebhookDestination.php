@@ -6,6 +6,7 @@ namespace EventPulse\Infrastructure\WebhookDestination\Persistence;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Eloquent persistence representation of a WebhookDestination.
@@ -23,14 +24,14 @@ use Illuminate\Database\Eloquent\Model;
  *  secret is handled (e.g., accidentally exposing it via `$model->toArray()`
  *  before the cast runs). Explicit > implicit for security-sensitive columns.
  *
- * @property string                          $id
- * @property string                          $api_key_id
- * @property string                          $url
- * @property string|null                     $name
- * @property string                          $secret_encrypted
- * @property string                          $status
- * @property \Illuminate\Support\Carbon      $created_at
- * @property \Illuminate\Support\Carbon      $updated_at
+ * @property string $id
+ * @property string $api_key_id
+ * @property string $url
+ * @property string|null $name
+ * @property string $secret_encrypted
+ * @property string $status
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 final class EloquentWebhookDestination extends Model
 {

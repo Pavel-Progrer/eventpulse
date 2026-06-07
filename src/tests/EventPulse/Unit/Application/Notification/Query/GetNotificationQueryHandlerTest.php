@@ -27,12 +27,13 @@ final class GetNotificationQueryHandlerTest extends TestCase
     private const string MISSING_ID = 'a0000000-0000-4000-8000-000000000001';
 
     private InMemoryNotificationRepository $repository;
+
     private GetNotificationQueryHandler $handler;
 
     protected function setUp(): void
     {
-        $this->repository = new InMemoryNotificationRepository();
-        $this->handler    = new GetNotificationQueryHandler($this->repository);
+        $this->repository = new InMemoryNotificationRepository;
+        $this->handler = new GetNotificationQueryHandler($this->repository);
     }
 
     #[Test]
@@ -43,7 +44,7 @@ final class GetNotificationQueryHandlerTest extends TestCase
 
         $result = ($this->handler)(new GetNotificationQuery(
             notificationId: $notification->id()->toString(),
-            apiKeyId:       'api-key-abc',
+            apiKeyId: 'api-key-abc',
         ));
 
         self::assertTrue($notification->id()->equals($result->id()));
@@ -56,7 +57,7 @@ final class GetNotificationQueryHandlerTest extends TestCase
 
         ($this->handler)(new GetNotificationQuery(
             notificationId: self::MISSING_ID,
-            apiKeyId:       'api-key-abc',
+            apiKeyId: 'api-key-abc',
         ));
     }
 
@@ -70,7 +71,7 @@ final class GetNotificationQueryHandlerTest extends TestCase
 
         ($this->handler)(new GetNotificationQuery(
             notificationId: $notification->id()->toString(),
-            apiKeyId:       'api-key-different-tenant',
+            apiKeyId: 'api-key-different-tenant',
         ));
     }
 
@@ -85,7 +86,7 @@ final class GetNotificationQueryHandlerTest extends TestCase
 
         ($this->handler)(new GetNotificationQuery(
             notificationId: 'not-a-uuid-at-all',
-            apiKeyId:       'api-key-abc',
+            apiKeyId: 'api-key-abc',
         ));
     }
 
@@ -100,12 +101,12 @@ final class GetNotificationQueryHandlerTest extends TestCase
         $this->repository->save($notification);
 
         $wrongTenantException = null;
-        $unknownIdException   = null;
+        $unknownIdException = null;
 
         try {
             ($this->handler)(new GetNotificationQuery(
                 notificationId: $notification->id()->toString(),
-                apiKeyId:       'api-key-other',
+                apiKeyId: 'api-key-other',
             ));
         } catch (NotificationNotFoundException $e) {
             $wrongTenantException = $e;
@@ -114,7 +115,7 @@ final class GetNotificationQueryHandlerTest extends TestCase
         try {
             ($this->handler)(new GetNotificationQuery(
                 notificationId: self::MISSING_ID,
-                apiKeyId:       'api-key-owner',
+                apiKeyId: 'api-key-owner',
             ));
         } catch (NotificationNotFoundException $e) {
             $unknownIdException = $e;

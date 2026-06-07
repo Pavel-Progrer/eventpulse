@@ -37,9 +37,9 @@ final class RegisterWebhookDestinationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'url'    => ['required', 'string', 'url', 'max:2048', 'regex:/^https:\/\//'],
+            'url' => ['required', 'string', 'url', 'max:2048', 'regex:/^https:\/\//'],
             'secret' => ['required', 'string', 'min:16', 'max:256'],
-            'name'   => ['nullable', 'string', 'max:128'],
+            'name' => ['nullable', 'string', 'max:128'],
         ];
     }
 

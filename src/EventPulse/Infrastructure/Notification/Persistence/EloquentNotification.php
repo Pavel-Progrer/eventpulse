@@ -6,6 +6,7 @@ namespace EventPulse\Infrastructure\Notification\Persistence;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Eloquent persistence representation of a Notification.
@@ -29,20 +30,20 @@ use Illuminate\Database\Eloquent\Model;
  * The class is deliberately spartan: no relations, no scopes, no observers.
  * Behaviour belongs on the aggregate; this is a row-mapper.
  *
- * @property string                          $id
- * @property string                          $api_key_id
- * @property string                          $channel
- * @property string                          $recipient
- * @property string                          $priority
- * @property array<string, mixed>            $payload
- * @property string                          $status
- * @property \Illuminate\Support\Carbon|null $dispatched_at
- * @property \Illuminate\Support\Carbon|null $scheduled_for
- * @property string                          $correlation_id
- * @property string                          $idempotency_key
- * @property string|null                     $replay_of_id
- * @property \Illuminate\Support\Carbon      $created_at
- * @property \Illuminate\Support\Carbon      $updated_at
+ * @property string $id
+ * @property string $api_key_id
+ * @property string $channel
+ * @property string $recipient
+ * @property string $priority
+ * @property array<string, mixed> $payload
+ * @property string $status
+ * @property Carbon|null $dispatched_at
+ * @property Carbon|null $scheduled_for
+ * @property string $correlation_id
+ * @property string $idempotency_key
+ * @property string|null $replay_of_id
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 final class EloquentNotification extends Model
 {
@@ -63,7 +64,7 @@ final class EloquentNotification extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'payload'       => 'array',
+        'payload' => 'array',
         'dispatched_at' => 'datetime',
         'scheduled_for' => 'datetime',
     ];

@@ -126,21 +126,21 @@ final class DispatchNotificationJob implements ShouldQueue
 
         $logContext = [
             'notification_id' => $notification->id()->toString(),
-            'channel'         => $notification->channel()->value,
-            'correlation_id'  => $this->correlationId,
+            'channel' => $notification->channel()->value,
+            'correlation_id' => $this->correlationId,
         ];
 
         // 1. Claim the attempt. Persisting *before* the I/O is deliberate:
         //    if the worker crashes mid-dispatch, the in-progress attempt
         //    is visible in the database, which makes operator triage
         //    possible without log archaeology.
-        $now           = $clock->now();
-        $attempt       = $notification->beginAttempt($now);
+        $now = $clock->now();
+        $attempt = $notification->beginAttempt($now);
         $attemptNumber = $attempt->number()->toInt();
         $repository->save($notification);
 
         $logger->info('notification.dispatch.started', $logContext + [
-            'event'          => 'notification.dispatch.started',
+            'event' => 'notification.dispatch.started',
             'attempt_number' => $attemptNumber,
         ]);
 
@@ -159,8 +159,8 @@ final class DispatchNotificationJob implements ShouldQueue
             $notification->recordSuccess($now);
 
             $logger->info('notification.dispatch.succeeded', $logContext + [
-                'event'               => 'notification.dispatch.succeeded',
-                'attempt_number'      => $attemptNumber,
+                'event' => 'notification.dispatch.succeeded',
+                'attempt_number' => $attemptNumber,
                 'provider_message_id' => $outcome->providerMessageId,
             ]);
         } else {
@@ -172,24 +172,24 @@ final class DispatchNotificationJob implements ShouldQueue
             // free of "retry vs not" branching that the domain already
             // owns.
             $maxAttempts = $retryPolicy->maxAttemptsFor($notification->channel());
-            $retryAt     = $now->add(
+            $retryAt = $now->add(
                 $retryPolicy->nextDelay($notification->channel(), $attempt->number()),
             );
 
             $notification->recordFailure(
                 classification: $outcome->classification,
-                reason:         $outcome->reason,
-                maxAttempts:    $maxAttempts,
-                now:            $now,
-                retryAfter:     $retryAt,
+                reason: $outcome->reason,
+                maxAttempts: $maxAttempts,
+                now: $now,
+                retryAfter: $retryAt,
             );
 
             $logger->warning('notification.dispatch.failed', $logContext + [
-                'event'          => 'notification.dispatch.failed',
+                'event' => 'notification.dispatch.failed',
                 'attempt_number' => $attemptNumber,
                 'classification' => $outcome->classification->value,
-                'reason'         => $outcome->reason,
-                'max_attempts'   => $maxAttempts,
+                'reason' => $outcome->reason,
+                'max_attempts' => $maxAttempts,
             ]);
         }
 
@@ -210,15 +210,15 @@ final class DispatchNotificationJob implements ShouldQueue
         if ($notification->status() === NotificationStatus::Queued && $retryAt !== null) {
             $dispatchQueue->enqueue(
                 notificationId: $notification->id(),
-                correlationId:  $notification->correlationId(),
-                priority:       $notification->priority(),
-                availableAt:    $retryAt,
+                correlationId: $notification->correlationId(),
+                priority: $notification->priority(),
+                availableAt: $retryAt,
             );
 
             $logger->info('notification.dispatch.retry_scheduled', $logContext + [
-                'event'                 => 'notification.dispatch.retry_scheduled',
+                'event' => 'notification.dispatch.retry_scheduled',
                 'failed_attempt_number' => $attemptNumber,
-                'retry_after'           => $retryAt->format(\DateTimeInterface::ATOM),
+                'retry_after' => $retryAt->format(\DateTimeInterface::ATOM),
             ]);
         }
 

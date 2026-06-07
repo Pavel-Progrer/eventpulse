@@ -19,8 +19,9 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Log\NullLogger;
 use RuntimeException;
-use Tests\TestCase;
 use Tests\Integration\Notification\Channel\Doubles\RecordingMailer;
+use Tests\TestCase;
+
 /**
  * Behaviour: the email driver translates a `DispatchRequest` into a
  * concrete SMTP send via Laravel's `Mailer`, populates from/to/subject
@@ -37,18 +38,19 @@ use Tests\Integration\Notification\Channel\Doubles\RecordingMailer;
 final class EmailChannelDriverTest extends TestCase
 {
     private RecordingMailer $mailer;
+
     private EmailChannelDriver $driver;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->mailer = new RecordingMailer();
+        $this->mailer = new RecordingMailer;
         $this->driver = new EmailChannelDriver(
-            mailer:      $this->mailer,
-            logger:      new NullLogger(),
+            mailer: $this->mailer,
+            logger: new NullLogger,
             fromAddress: 'noreply@eventpulse.test',
-            fromName:    'EventPulse Test',
+            fromName: 'EventPulse Test',
         );
     }
 
@@ -63,7 +65,7 @@ final class EmailChannelDriverTest extends TestCase
     {
         $request = $this->emailRequest([
             'subject' => 'Welcome to EventPulse',
-            'html'    => '<p>Hello!</p>',
+            'html' => '<p>Hello!</p>',
         ]);
 
         $outcome = $this->driver->dispatch($request);
@@ -84,7 +86,7 @@ final class EmailChannelDriverTest extends TestCase
     {
         $request = $this->emailRequest([
             'subject' => 'Plain text test',
-            'text'    => 'Hello from EventPulse',
+            'text' => 'Hello from EventPulse',
         ]);
 
         $outcome = $this->driver->dispatch($request);
@@ -100,8 +102,8 @@ final class EmailChannelDriverTest extends TestCase
     {
         $request = $this->emailRequest([
             'subject' => 'Both parts',
-            'html'    => '<p>HTML version</p>',
-            'text'    => 'Text version',
+            'html' => '<p>HTML version</p>',
+            'text' => 'Text version',
         ]);
 
         $outcome = $this->driver->dispatch($request);
@@ -175,11 +177,11 @@ final class EmailChannelDriverTest extends TestCase
         // the bug as a programmer error rather than a silent failure.
         $request = new DispatchRequest(
             notificationId: NotificationId::generate(),
-            channel:        Channel::Email,
-            recipient:      WebhookRecipient::fromDestinationId('11111111-2222-4333-8444-555555555555'),
-            payload:        NotificationPayload::forChannel(['subject' => 's', 'text' => 't'], Channel::Email),
-            correlationId:  CorrelationId::generate(),
-            attemptNumber:  AttemptNumber::first(),
+            channel: Channel::Email,
+            recipient: WebhookRecipient::fromDestinationId('11111111-2222-4333-8444-555555555555'),
+            payload: NotificationPayload::forChannel(['subject' => 's', 'text' => 't'], Channel::Email),
+            correlationId: CorrelationId::generate(),
+            attemptNumber: AttemptNumber::first(),
         );
 
         $this->expectException(LogicException::class);
@@ -194,10 +196,10 @@ final class EmailChannelDriverTest extends TestCase
         $this->expectExceptionMessage('non-empty fromAddress');
 
         new EmailChannelDriver(
-            mailer:      $this->mailer,
-            logger:      new NullLogger(),
+            mailer: $this->mailer,
+            logger: new NullLogger,
             fromAddress: '',
-            fromName:    'EventPulse',
+            fromName: 'EventPulse',
         );
     }
 
@@ -210,15 +212,15 @@ final class EmailChannelDriverTest extends TestCase
         $this->expectExceptionMessage('non-empty fromName');
 
         new EmailChannelDriver(
-            mailer:      $this->mailer,
-            logger:      new NullLogger(),
+            mailer: $this->mailer,
+            logger: new NullLogger,
             fromAddress: 'noreply@eventpulse.test',
-            fromName:    '   ',
+            fromName: '   ',
         );
     }
 
     /**
-     * @param array<string, mixed>|null $payload
+     * @param  array<string, mixed>|null  $payload
      */
     private function emailRequest(?array $payload = null): DispatchRequest
     {
@@ -226,11 +228,11 @@ final class EmailChannelDriverTest extends TestCase
 
         return new DispatchRequest(
             notificationId: NotificationId::generate(),
-            channel:        Channel::Email,
-            recipient:      EmailRecipient::fromString('user@example.com'),
-            payload:        NotificationPayload::forChannel($payload, Channel::Email),
-            correlationId:  CorrelationId::generate(),
-            attemptNumber:  AttemptNumber::first(),
+            channel: Channel::Email,
+            recipient: EmailRecipient::fromString('user@example.com'),
+            payload: NotificationPayload::forChannel($payload, Channel::Email),
+            correlationId: CorrelationId::generate(),
+            attemptNumber: AttemptNumber::first(),
         );
     }
 }

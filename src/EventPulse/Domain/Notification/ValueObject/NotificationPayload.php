@@ -22,7 +22,7 @@ use EventPulse\Domain\Notification\Enum\Channel;
 final class NotificationPayload
 {
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function __construct(
         private readonly array $data,
@@ -30,7 +30,7 @@ final class NotificationPayload
     ) {}
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public static function forChannel(array $data, Channel $channel): self
     {
@@ -94,12 +94,12 @@ final class NotificationPayload
 
             // Lists (zero-indexed sequential): compare element-wise in order.
             if (array_is_list($a) || array_is_list($b)) {
-                if (!array_is_list($a) || !array_is_list($b)) {
+                if (! array_is_list($a) || ! array_is_list($b)) {
                     return false;
                 }
 
                 foreach ($a as $i => $value) {
-                    if (!self::deepEquals($value, $b[$i])) {
+                    if (! self::deepEquals($value, $b[$i])) {
                         return false;
                     }
                 }
@@ -109,7 +109,7 @@ final class NotificationPayload
 
             // Associative: compare by key set, ignoring declaration order.
             foreach ($a as $key => $value) {
-                if (!array_key_exists($key, $b) || !self::deepEquals($value, $b[$key])) {
+                if (! array_key_exists($key, $b) || ! self::deepEquals($value, $b[$key])) {
                     return false;
                 }
             }
@@ -125,14 +125,14 @@ final class NotificationPayload
     // ---------------------------------------------------------------------------
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private static function validate(array $data, Channel $channel): void
     {
         match ($channel) {
-            Channel::Email   => self::validateEmail($data),
+            Channel::Email => self::validateEmail($data),
             Channel::Webhook => self::validateWebhook($data),
-            Channel::Sms     => self::validateSms($data),
+            Channel::Sms => self::validateSms($data),
         };
     }
 
@@ -140,18 +140,18 @@ final class NotificationPayload
      * Email payload requires a non-empty subject and body (text or html).
      * Both may be present simultaneously.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private static function validateEmail(array $data): void
     {
-        if (empty($data['subject']) || !is_string($data['subject'])) {
+        if (empty($data['subject']) || ! is_string($data['subject'])) {
             throw new \InvalidArgumentException('Email payload must include a non-empty string "subject".');
         }
 
         $hasText = isset($data['text']) && is_string($data['text']) && $data['text'] !== '';
         $hasHtml = isset($data['html']) && is_string($data['html']) && $data['html'] !== '';
 
-        if (!$hasText && !$hasHtml) {
+        if (! $hasText && ! $hasHtml) {
             throw new \InvalidArgumentException(
                 'Email payload must include at least one of "text" or "html" body.'
             );
@@ -164,7 +164,7 @@ final class NotificationPayload
      * nothing meaningful, and the caller who does this almost certainly
      * made a mistake).
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private static function validateWebhook(array $data): void
     {
@@ -178,11 +178,11 @@ final class NotificationPayload
      * 10 concatenated SMS segments; longer values are rejected at the domain
      * layer because they cannot be delivered and would incur cost silently.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private static function validateSms(array $data): void
     {
-        if (empty($data['body']) || !is_string($data['body'])) {
+        if (empty($data['body']) || ! is_string($data['body'])) {
             throw new \InvalidArgumentException('SMS payload must include a non-empty string "body".');
         }
 

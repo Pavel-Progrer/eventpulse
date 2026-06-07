@@ -27,15 +27,15 @@ final class ListNotificationsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status'         => ['sometimes', 'array'],
-            'status.*'       => ['string', 'in:queued,processing,dispatched,failed,dead_lettered,retry_scheduled'],
-            'channel'        => ['sometimes', 'array'],
-            'channel.*'      => ['string', 'in:email,sms,webhook'],
+            'status' => ['sometimes', 'array'],
+            'status.*' => ['string', 'in:queued,processing,dispatched,failed,dead_lettered,retry_scheduled'],
+            'channel' => ['sometimes', 'array'],
+            'channel.*' => ['string', 'in:email,sms,webhook'],
             'correlation_id' => ['sometimes', 'string', 'max:255'],
-            'created_after'  => ['sometimes', 'date'],
+            'created_after' => ['sometimes', 'date'],
             'created_before' => ['sometimes', 'date'],
-            'limit'          => ['sometimes', 'integer', 'min:1', 'max:200'],
-            'cursor'         => ['sometimes', 'string'],
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:200'],
+            'cursor' => ['sometimes', 'string'],
         ];
     }
 }

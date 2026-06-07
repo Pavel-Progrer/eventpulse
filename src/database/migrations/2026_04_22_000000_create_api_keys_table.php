@@ -34,7 +34,8 @@ use Illuminate\Support\Facades\Schema;
  *  - status        active | revoked | rotated.
  *  - revoked_at    Timestamp; null when status is not `revoked`.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('api_keys', function (Blueprint $table): void {

@@ -35,7 +35,7 @@ final class DeadLetterMarkTest extends TestCase
     public function it_starts_in_the_not_yet_replayed_state(): void
     {
         $mark = new DeadLetterMark(
-            reason:         'max_retries_exceeded',
+            reason: 'max_retries_exceeded',
             deadLetteredAt: new DateTimeImmutable('2026-04-27T10:00:00Z'),
         );
 
@@ -49,9 +49,9 @@ final class DeadLetterMarkTest extends TestCase
     #[Test]
     public function record_replay_populates_id_and_timestamp_together(): void
     {
-        $mark        = $this->newMark();
-        $replayId    = NotificationId::generate();
-        $replayedAt  = new DateTimeImmutable('2026-04-27T11:30:00Z');
+        $mark = $this->newMark();
+        $replayId = NotificationId::generate();
+        $replayedAt = new DateTimeImmutable('2026-04-27T11:30:00Z');
 
         $mark->recordReplay($replayId, $replayedAt);
 
@@ -80,7 +80,7 @@ final class DeadLetterMarkTest extends TestCase
         // initial state itself was already-replayed.
         $mark = $this->newMark();
 
-        $first  = NotificationId::generate();
+        $first = NotificationId::generate();
         $firstAt = new DateTimeImmutable('2026-04-27T11:00:00Z');
 
         $mark->reconstituteReplay($first, $firstAt);
@@ -89,7 +89,7 @@ final class DeadLetterMarkTest extends TestCase
         // request) must not blow up. This is intentionally permissive: the
         // domain's once-only invariant is enforced by `recordReplay`, not
         // by `reconstituteReplay`.
-        $second  = NotificationId::generate();
+        $second = NotificationId::generate();
         $secondAt = new DateTimeImmutable('2026-04-27T12:00:00Z');
 
         $mark->reconstituteReplay($second, $secondAt);
@@ -101,7 +101,7 @@ final class DeadLetterMarkTest extends TestCase
     private function newMark(): DeadLetterMark
     {
         return new DeadLetterMark(
-            reason:         'max_retries_exceeded',
+            reason: 'max_retries_exceeded',
             deadLetteredAt: new DateTimeImmutable('2026-04-27T10:00:00Z'),
         );
     }

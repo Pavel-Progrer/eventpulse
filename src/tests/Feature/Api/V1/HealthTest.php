@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1;
 
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
@@ -47,7 +48,7 @@ final class HealthTest extends TestCase
         $response = $this->getJson('/api/v1/health');
 
         $response->assertStatus(200)
-                 ->assertExactJson(['status' => 'ok']);
+            ->assertExactJson(['status' => 'ok']);
     }
 
     #[Test]
@@ -72,8 +73,8 @@ final class HealthTest extends TestCase
         $response->assertJsonStructure([
             'status',
             'checks' => [
-                'database'    => ['status', 'latency_ms'],
-                'redis'       => ['status', 'latency_ms'],
+                'database' => ['status', 'latency_ms'],
+                'redis' => ['status', 'latency_ms'],
                 'queue_depth' => ['status', 'pending'],
             ],
             'version',
@@ -163,11 +164,11 @@ final class HealthTest extends TestCase
         // clear/getMultiple/setMultiple/deleteMultiple/has) varies across
         // Laravel versions. Mockery::mock() generates all stubs automatically
         // and lets us override only the one behaviour we need.
-        $mock = \Mockery::mock(\Illuminate\Contracts\Cache\Repository::class);
+        $mock = \Mockery::mock(Repository::class);
         $mock->allows()->put(\Mockery::any(), \Mockery::any(), \Mockery::any())
-             ->andThrow(new \RuntimeException('Connection to Redis refused'));
+            ->andThrow(new \RuntimeException('Connection to Redis refused'));
 
-        $this->app->instance(\Illuminate\Contracts\Cache\Repository::class, $mock);
+        $this->app->instance(Repository::class, $mock);
 
         $response = $this->getJson('/api/v1/health/detailed');
 

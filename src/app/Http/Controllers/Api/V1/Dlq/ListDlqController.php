@@ -40,13 +40,13 @@ final class ListDlqController
         $apiKey = $request->attributes->get('api_key');
 
         $query = new ListDeadLetteredQuery(
-            apiKeyId:      $apiKey->id,
-            reason:        $request->validated('reason'),
-            channel:       $this->parseChannel($request->validated('channel')),
-            createdAfter:  $this->parseDateTime($request->validated('created_after')),
+            apiKeyId: $apiKey->id,
+            reason: $request->validated('reason'),
+            channel: $this->parseChannel($request->validated('channel')),
+            createdAfter: $this->parseDateTime($request->validated('created_after')),
             createdBefore: $this->parseDateTime($request->validated('created_before')),
-            limit:         (int) $request->validated('limit', 25),
-            cursor:        $request->validated('cursor'),
+            limit: (int) $request->validated('limit', 25),
+            cursor: $request->validated('cursor'),
         );
 
         $page = ($this->handler)($query);

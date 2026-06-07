@@ -101,7 +101,7 @@ final class Notification
     /**
      * Creates a new Notification from a caller's dispatch request.
      *
-     * @param array<string, mixed> $rawPayload Raw payload array; validated by NotificationPayload.
+     * @param  array<string, mixed>  $rawPayload  Raw payload array; validated by NotificationPayload.
      */
     public static function request(
         NotificationId $id,
@@ -120,27 +120,27 @@ final class Notification
         $payload = NotificationPayload::forChannel($rawPayload, $channel);
 
         $notification = new self(
-            id:             $id,
-            channel:        $channel,
-            recipient:      $recipient,
-            payload:        $payload,
-            priority:       $priority,
+            id: $id,
+            channel: $channel,
+            recipient: $recipient,
+            payload: $payload,
+            priority: $priority,
             idempotencyKey: $idempotencyKey,
-            apiKeyId:       $apiKeyId,
-            createdAt:      $now,
-            status:         NotificationStatus::Queued,
-            correlationId:  $correlationId,
-            replayOf:       $replayOf,
+            apiKeyId: $apiKeyId,
+            createdAt: $now,
+            status: NotificationStatus::Queued,
+            correlationId: $correlationId,
+            replayOf: $replayOf,
         );
 
         $notification->recordEvent(new NotificationRequested(
             notificationId: $id,
-            channel:        $channel,
-            recipient:      $recipient,
-            priority:       $priority,
+            channel: $channel,
+            recipient: $recipient,
+            priority: $priority,
             idempotencyKey: $idempotencyKey,
-            occurredAt:     $now,
-            correlationId:  $correlationId,
+            occurredAt: $now,
+            correlationId: $correlationId,
         ));
 
         return $notification;
@@ -157,16 +157,16 @@ final class Notification
 
         $this->transitionTo(NotificationStatus::Processing);
 
-        $number  = $this->nextAttemptNumber();
+        $number = $this->nextAttemptNumber();
         $attempt = new Attempt($number, $now);
 
         $this->attempts[$number->toInt()] = $attempt;
 
         $this->recordEvent(new NotificationDispatchAttempted(
             notificationId: $this->id,
-            attemptNumber:  $number,
-            occurredAt:     $now,
-            correlationId:  $this->correlationId,
+            attemptNumber: $number,
+            occurredAt: $now,
+            correlationId: $this->correlationId,
         ));
 
         return $attempt;
@@ -180,17 +180,17 @@ final class Notification
         $this->transitionTo(NotificationStatus::Dispatched);
 
         $this->recordEvent(new NotificationDispatched(
-            notificationId:    $this->id,
+            notificationId: $this->id,
             succeededOnAttempt: $attempt->number(),
-            occurredAt:         $now,
-            correlationId:      $this->correlationId,
+            occurredAt: $now,
+            correlationId: $this->correlationId,
         ));
     }
 
     /**
-     * @param int $maxAttempts The ceiling enforced by the channel's retry policy.
-     *                         Passed in rather than hard-coded so the policy lives
-     *                         in configuration, not in the domain model.
+     * @param  int  $maxAttempts  The ceiling enforced by the channel's retry policy.
+     *                            Passed in rather than hard-coded so the policy lives
+     *                            in configuration, not in the domain model.
      */
     public function recordFailure(
         FailureClassification $classification,
@@ -204,11 +204,11 @@ final class Notification
 
         $this->recordEvent(new NotificationDispatchFailed(
             notificationId: $this->id,
-            attemptNumber:  $attempt->number(),
+            attemptNumber: $attempt->number(),
             classification: $classification,
-            reason:         $reason,
-            occurredAt:     $now,
-            correlationId:  $this->correlationId,
+            reason: $reason,
+            occurredAt: $now,
+            correlationId: $this->correlationId,
         ));
 
         $retriesRemaining = $classification->isRetryEligible()
@@ -218,12 +218,12 @@ final class Notification
             $this->transitionTo(NotificationStatus::Queued);
 
             $this->recordEvent(new NotificationScheduledForRetry(
-                notificationId:    $this->id,
+                notificationId: $this->id,
                 failedAttemptNumber: $attempt->number(),
-                nextAttemptNumber:   $attempt->number()->next(),
-                retryAfter:          $retryAfter,
-                occurredAt:          $now,
-                correlationId:       $this->correlationId,
+                nextAttemptNumber: $attempt->number()->next(),
+                retryAfter: $retryAfter,
+                occurredAt: $now,
+                correlationId: $this->correlationId,
             ));
 
             return;
@@ -245,10 +245,10 @@ final class Notification
     }
 
     /**
-     * @param string $reason The DLQ category — one of the
-     *                       `DLQ_REASON_*` class constants. NOT the
-     *                       free-form per-attempt failure string;
-     *                       that lives on the `Attempt` entity.
+     * @param  string  $reason  The DLQ category — one of the
+     *                          `DLQ_REASON_*` class constants. NOT the
+     *                          free-form per-attempt failure string;
+     *                          that lives on the `Attempt` entity.
      */
     private function deadLetter(string $reason, DateTimeImmutable $now): void
     {
@@ -261,14 +261,14 @@ final class Notification
         }
 
         $this->deadLetterMark = new DeadLetterMark($reason, $now);
-        $this->status         = NotificationStatus::DeadLettered;
+        $this->status = NotificationStatus::DeadLettered;
 
         $this->recordEvent(new NotificationDeadLettered(
             notificationId: $this->id,
-            totalAttempts:  AttemptNumber::fromInt(count($this->attempts)),
-            reason:         $reason,
-            occurredAt:     $now,
-            correlationId:  $this->correlationId,
+            totalAttempts: AttemptNumber::fromInt(count($this->attempts)),
+            reason: $reason,
+            occurredAt: $now,
+            correlationId: $this->correlationId,
         ));
     }
 
@@ -280,11 +280,11 @@ final class Notification
 
         $this->recordEvent(new NotificationDispatchFailed(
             notificationId: $this->id,
-            attemptNumber:  AttemptNumber::fromInt(count($this->attempts) + 1),
+            attemptNumber: AttemptNumber::fromInt(count($this->attempts) + 1),
             classification: FailureClassification::Unrecoverable,
-            reason:         $reason,
-            occurredAt:     $now,
-            correlationId:  $this->correlationId,
+            reason: $reason,
+            occurredAt: $now,
+            correlationId: $this->correlationId,
         ));
     }
 
@@ -322,9 +322,9 @@ final class Notification
 
         $this->recordEvent(new NotificationReplayed(
             originalNotificationId: $this->id,
-            replayNotificationId:   $replayNotificationId,
-            occurredAt:             $now,
-            correlationId:          $this->correlationId,
+            replayNotificationId: $replayNotificationId,
+            occurredAt: $now,
+            correlationId: $this->correlationId,
         ));
     }
 
@@ -378,7 +378,7 @@ final class Notification
      */
     public function pullPendingEvents(): array
     {
-        $events              = $this->pendingEvents;
+        $events = $this->pendingEvents;
         $this->pendingEvents = [];
 
         return $events;
@@ -449,37 +449,37 @@ final class Notification
     }
 
     /**
- * Latest `completedAt` across this notification's attempts, or `null`
- * if no attempt has completed (every attempt is in-progress, or the
- * notification has no attempts at all).
- *
- * Lives on the aggregate because it is a property of the notification's
- * own history. The DLQ list endpoint computes the same value via a
- * `MAX(attempts.completed_at)` SQL sub-select for efficiency at scale;
- * the two implementations express the same definition in different
- * layers and must stay aligned. If the definition ever changes (e.g.
- * "latest *failed* attempt" vs "latest of any kind"), update both.
- *
- * @see EloquentDeadLetteredNotificationsRepository::list  for the SQL twin.
- */
-public function finalAttemptAt(): ?DateTimeImmutable
-{
-    $latest = null;
+     * Latest `completedAt` across this notification's attempts, or `null`
+     * if no attempt has completed (every attempt is in-progress, or the
+     * notification has no attempts at all).
+     *
+     * Lives on the aggregate because it is a property of the notification's
+     * own history. The DLQ list endpoint computes the same value via a
+     * `MAX(attempts.completed_at)` SQL sub-select for efficiency at scale;
+     * the two implementations express the same definition in different
+     * layers and must stay aligned. If the definition ever changes (e.g.
+     * "latest *failed* attempt" vs "latest of any kind"), update both.
+     *
+     * @see EloquentDeadLetteredNotificationsRepository::list  for the SQL twin.
+     */
+    public function finalAttemptAt(): ?DateTimeImmutable
+    {
+        $latest = null;
 
-    foreach ($this->attempts as $attempt) {
-        $completed = $attempt->completedAt();
+        foreach ($this->attempts as $attempt) {
+            $completed = $attempt->completedAt();
 
-        if ($completed === null) {
-            continue;
+            if ($completed === null) {
+                continue;
+            }
+
+            if ($latest === null || $completed > $latest) {
+                $latest = $completed;
+            }
         }
 
-        if ($latest === null || $completed > $latest) {
-            $latest = $completed;
-        }
+        return $latest;
     }
-
-    return $latest;
-}
 
     /**
      * @return Attempt[]
@@ -499,7 +499,7 @@ public function finalAttemptAt(): ?DateTimeImmutable
     // ---------------------------------------------------------------------------
 
     /**
-     * @param Attempt[] $attempts
+     * @param  Attempt[]  $attempts
      */
     public static function reconstitute(
         NotificationId $id,
@@ -516,20 +516,20 @@ public function finalAttemptAt(): ?DateTimeImmutable
         ?DeadLetterMark $deadLetterMark,
         ?NotificationId $replayOf,
     ): self {
-        $notification                 = new self(
-            id:             $id,
-            channel:        $channel,
-            recipient:      $recipient,
-            payload:        $payload,
-            priority:       $priority,
+        $notification = new self(
+            id: $id,
+            channel: $channel,
+            recipient: $recipient,
+            payload: $payload,
+            priority: $priority,
             idempotencyKey: $idempotencyKey,
-            apiKeyId:       $apiKeyId,
-            createdAt:      $createdAt,
-            status:         $status,
-            correlationId:  $correlationId,
-            replayOf:       $replayOf,
+            apiKeyId: $apiKeyId,
+            createdAt: $createdAt,
+            status: $status,
+            correlationId: $correlationId,
+            replayOf: $replayOf,
         );
-        $notification->attempts       = $attempts;
+        $notification->attempts = $attempts;
         $notification->deadLetterMark = $deadLetterMark;
 
         return $notification;
@@ -546,7 +546,7 @@ public function finalAttemptAt(): ?DateTimeImmutable
 
     private function transitionTo(NotificationStatus $next): void
     {
-        if (!$this->status->canTransitionTo($next)) {
+        if (! $this->status->canTransitionTo($next)) {
             throw new InvalidNotificationTransitionException(
                 sprintf(
                     'Cannot transition Notification from %s to %s.',
@@ -608,27 +608,27 @@ public function finalAttemptAt(): ?DateTimeImmutable
     {
         return count(array_filter(
             $this->attempts,
-            fn(Attempt $a): bool => $a->succeeded() === false,
+            fn (Attempt $a): bool => $a->succeeded() === false,
         ));
     }
 
     private static function assertRecipientMatchesChannel(Recipient $recipient, Channel $channel): void
     {
         $valid = match ($channel) {
-            Channel::Email   => $recipient instanceof EmailRecipient,
+            Channel::Email => $recipient instanceof EmailRecipient,
             Channel::Webhook => $recipient instanceof WebhookRecipient,
-            Channel::Sms     => $recipient instanceof SmsRecipient,
+            Channel::Sms => $recipient instanceof SmsRecipient,
         };
 
-        if (!$valid) {
+        if (! $valid) {
             throw new RecipientChannelMismatchException(
                 sprintf(
                     'Channel %s requires a %s recipient; got %s.',
                     $channel->value,
                     match ($channel) {
-                        Channel::Email   => EmailRecipient::class,
+                        Channel::Email => EmailRecipient::class,
                         Channel::Webhook => WebhookRecipient::class,
-                        Channel::Sms     => SmsRecipient::class,
+                        Channel::Sms => SmsRecipient::class,
                     },
                     $recipient::class,
                 )

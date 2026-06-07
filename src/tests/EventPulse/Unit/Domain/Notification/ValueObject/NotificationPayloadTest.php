@@ -169,7 +169,7 @@ final class NotificationPayloadTest extends TestCase
 
     public function test_payloads_with_different_channels_are_not_equal(): void
     {
-        $emailPayload   = NotificationPayload::forChannel(
+        $emailPayload = NotificationPayload::forChannel(
             ['subject' => 'Hi', 'text' => 'There'],
             Channel::Email,
         );

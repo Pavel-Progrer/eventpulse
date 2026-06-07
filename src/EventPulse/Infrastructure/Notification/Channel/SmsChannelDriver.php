@@ -57,7 +57,7 @@ final class SmsChannelDriver implements ChannelDriver
     #[\Override]
     public function dispatch(DispatchRequest $request): DispatchOutcome
     {
-        if (!$request->recipient instanceof SmsRecipient) {
+        if (! $request->recipient instanceof SmsRecipient) {
             throw new \LogicException(sprintf(
                 'SmsChannelDriver received a %s recipient; expected SmsRecipient.',
                 $request->recipient::class,
@@ -65,20 +65,20 @@ final class SmsChannelDriver implements ChannelDriver
         }
 
         $this->logger->warning('notification.sms.driver_unconfigured', [
-            'event'           => 'notification.sms.driver_unconfigured',
+            'event' => 'notification.sms.driver_unconfigured',
             'notification_id' => $request->notificationId->toString(),
-            'attempt_number'  => $request->attemptNumber->toInt(),
-            'recipient'       => $request->recipient->toString(),
-            'correlation_id'  => $request->correlationId->toString(),
-            'classification'  => FailureClassification::Permanent->value,
+            'attempt_number' => $request->attemptNumber->toInt(),
+            'recipient' => $request->recipient->toString(),
+            'correlation_id' => $request->correlationId->toString(),
+            'classification' => FailureClassification::Permanent->value,
         ]);
 
         return DispatchOutcome::failure(
             classification: FailureClassification::Permanent,
-            reason:         'SMS dispatch is not configured in this build. '
-                          . 'Replace EventPulse\\Infrastructure\\Notification\\Channel\\SmsChannelDriver '
-                          . 'with a provider integration (e.g. Twilio, MessageBird) and re-bind it '
-                          . 'in EventPulseServiceProvider to enable SMS delivery.',
+            reason: 'SMS dispatch is not configured in this build. '
+                          .'Replace EventPulse\\Infrastructure\\Notification\\Channel\\SmsChannelDriver '
+                          .'with a provider integration (e.g. Twilio, MessageBird) and re-bind it '
+                          .'in EventPulseServiceProvider to enable SMS delivery.',
         );
     }
 }

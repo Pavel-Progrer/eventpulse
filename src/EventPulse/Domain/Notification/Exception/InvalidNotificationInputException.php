@@ -10,6 +10,4 @@ namespace EventPulse\Domain\Notification\Exception;
  * violation). Distinct from generic InvalidArgumentException so the HTTP
  * layer can map it to 422 without catching unrelated framework errors.
  */
-class InvalidNotificationInputException extends \InvalidArgumentException
-{
-}
+class InvalidNotificationInputException extends \InvalidArgumentException {}

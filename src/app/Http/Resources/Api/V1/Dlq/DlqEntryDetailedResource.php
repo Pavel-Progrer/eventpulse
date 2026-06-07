@@ -35,7 +35,7 @@ final class DlqEntryDetailedResource extends JsonResource
     public function toArray(Request $request): array
     {
         $notification = $this->resource;
-        $mark         = $notification->deadLetterMark();
+        $mark = $notification->deadLetterMark();
 
         // Defensive: this resource is only ever invoked with a
         // dead-lettered notification (the handler enforces it). If we
@@ -57,10 +57,10 @@ final class DlqEntryDetailedResource extends JsonResource
             // row id, but the inspect-by-notification-id path doesn't
             // need it on the wire. We expose both to match the OpenAPI
             // contract; clients that key on either get a correct value.
-            'id'                     => $notification->id()->toString(),
-            'notification_id'        => $notification->id()->toString(),
-            'reason'                 => $mark->reason(),
-            'channel'                => $notification->channel()->value,
+            'id' => $notification->id()->toString(),
+            'notification_id' => $notification->id()->toString(),
+            'reason' => $mark->reason(),
+            'channel' => $notification->channel()->value,
 
             // `final_attempt_at` is the aggregate's own answer to "when
             // did the last completed attempt finish." The list endpoint
@@ -68,11 +68,11 @@ final class DlqEntryDetailedResource extends JsonResource
             // two implementations express the same definition in
             // different layers (see Notification::finalAttemptAt for the
             // contract).
-            'final_attempt_at'       => $notification->finalAttemptAt()?->format(\DateTimeInterface::ATOM),
+            'final_attempt_at' => $notification->finalAttemptAt()?->format(\DateTimeInterface::ATOM),
 
-            'replayed_at'            => $mark->replayedAt()?->format(\DateTimeInterface::ATOM),
+            'replayed_at' => $mark->replayedAt()?->format(\DateTimeInterface::ATOM),
             'replay_notification_id' => $mark->replayNotificationId()?->toString(),
-            'created_at'             => $mark->deadLetteredAt()->format(\DateTimeInterface::ATOM),
+            'created_at' => $mark->deadLetteredAt()->format(\DateTimeInterface::ATOM),
 
             // ── Embedded notification ───────────────────────────────────
             'notification' => $this->notificationToArray($notification),
@@ -85,17 +85,17 @@ final class DlqEntryDetailedResource extends JsonResource
     private function notificationToArray(Notification $notification): array
     {
         return [
-            'id'              => $notification->id()->toString(),
-            'channel'         => $notification->channel()->value,
-            'recipient'       => $notification->recipient()->toString(),
-            'priority'        => $notification->priority()->value,
-            'status'          => $notification->status()->value,
-            'payload'         => $notification->payload()->toArray(),
+            'id' => $notification->id()->toString(),
+            'channel' => $notification->channel()->value,
+            'recipient' => $notification->recipient()->toString(),
+            'priority' => $notification->priority()->value,
+            'status' => $notification->status()->value,
+            'payload' => $notification->payload()->toArray(),
             'idempotency_key' => $notification->idempotencyKey()->toString(),
-            'correlation_id'  => $notification->correlationId()->toString(),
-            'replay_of_id'    => $notification->replayOf()?->toString(),
-            'created_at'      => $notification->createdAt()->format(\DateTimeInterface::ATOM),
-            'attempts'        => $this->attemptsToArray($notification),
+            'correlation_id' => $notification->correlationId()->toString(),
+            'replay_of_id' => $notification->replayOf()?->toString(),
+            'created_at' => $notification->createdAt()->format(\DateTimeInterface::ATOM),
+            'attempts' => $this->attemptsToArray($notification),
         ];
     }
 
@@ -121,12 +121,12 @@ final class DlqEntryDetailedResource extends JsonResource
     private function attemptToArray(Attempt $attempt): array
     {
         return [
-            'number'         => $attempt->number()->toInt(),
-            'started_at'     => $attempt->startedAt()->format(\DateTimeInterface::ATOM),
-            'completed_at'   => $attempt->completedAt()?->format(\DateTimeInterface::ATOM),
-            'succeeded'      => $attempt->succeeded(),
+            'number' => $attempt->number()->toInt(),
+            'started_at' => $attempt->startedAt()->format(\DateTimeInterface::ATOM),
+            'completed_at' => $attempt->completedAt()?->format(\DateTimeInterface::ATOM),
+            'succeeded' => $attempt->succeeded(),
             'classification' => $attempt->failureClassification()?->value,
-            'reason'         => $attempt->failureReason(),
+            'reason' => $attempt->failureReason(),
         ];
     }
 }

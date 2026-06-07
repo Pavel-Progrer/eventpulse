@@ -50,9 +50,9 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         // non-zero value.
         $policy = new ChannelRetryPolicy(
             settings: [
-                Channel::Webhook->value => new RetrySettings(6, 0, 0,    0.25),
-                Channel::Email->value   => new RetrySettings(4, 30, 1800, 0.0),
-                Channel::Sms->value     => new RetrySettings(3, 15, 600,  0.0),
+                Channel::Webhook->value => new RetrySettings(6, 0, 0, 0.25),
+                Channel::Email->value => new RetrySettings(4, 30, 1800, 0.0),
+                Channel::Sms->value => new RetrySettings(3, 15, 600, 0.0),
             ],
             randomizer: $this->seeded(),
         );
@@ -76,8 +76,8 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         $policy = new ChannelRetryPolicy(
             settings: [
                 Channel::Webhook->value => new RetrySettings(6, 60, 60, 0.0),
-                Channel::Email->value   => new RetrySettings(4, 30, 1800, 0.0),
-                Channel::Sms->value     => new RetrySettings(3, 15, 600,  0.0),
+                Channel::Email->value => new RetrySettings(4, 30, 1800, 0.0),
+                Channel::Sms->value => new RetrySettings(3, 15, 600, 0.0),
             ],
             randomizer: $this->seeded(),
         );
@@ -101,9 +101,9 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         // max once doubling would exceed it, not that it sticks at 480.
         $policy = $this->zeroJitterPolicy();
 
-        self::assertSame(15,  $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(1))));
-        self::assertSame(30,  $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(2))));
-        self::assertSame(60,  $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(3))));
+        self::assertSame(15, $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(1))));
+        self::assertSame(30, $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(2))));
+        self::assertSame(60, $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(3))));
         self::assertSame(120, $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(4))));
         self::assertSame(240, $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(5))));
         self::assertSame(480, $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(6))));
@@ -124,8 +124,8 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         // The cap kicks in at attempt 7.
         $policy = $this->zeroJitterPolicy();
 
-        self::assertSame(30,   $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(1))));
-        self::assertSame(960,  $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(6))));
+        self::assertSame(30, $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(1))));
+        self::assertSame(960, $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(6))));
         self::assertSame(1800, $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(7))));
         self::assertSame(1800, $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(8))));
     }
@@ -140,8 +140,8 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         $policy = $this->zeroJitterPolicy();
 
         $webhook = $this->seconds($policy->nextDelay(Channel::Webhook, AttemptNumber::fromInt(1)));
-        $email   = $this->seconds($policy->nextDelay(Channel::Email,   AttemptNumber::fromInt(1)));
-        $sms     = $this->seconds($policy->nextDelay(Channel::Sms,     AttemptNumber::fromInt(1)));
+        $email = $this->seconds($policy->nextDelay(Channel::Email, AttemptNumber::fromInt(1)));
+        $sms = $this->seconds($policy->nextDelay(Channel::Sms, AttemptNumber::fromInt(1)));
 
         self::assertSame(10, $webhook);
         self::assertSame(30, $email);
@@ -204,8 +204,8 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         $policy = new ChannelRetryPolicy(
             settings: [
                 Channel::Webhook->value => new RetrySettings(6, 100, 100_000, 0.99),
-                Channel::Email->value   => new RetrySettings(4, 30, 1800, 0.0),
-                Channel::Sms->value     => new RetrySettings(3, 15, 600, 0.0),
+                Channel::Email->value => new RetrySettings(4, 30, 1800, 0.0),
+                Channel::Sms->value => new RetrySettings(3, 15, 600, 0.0),
             ],
             randomizer: $this->seeded(),
         );
@@ -236,8 +236,8 @@ final class ChannelRetryPolicyEdgeCasesTest extends TestCase
         return new ChannelRetryPolicy(
             settings: [
                 Channel::Webhook->value => new RetrySettings(6, 10, 3600, 0.0),
-                Channel::Email->value   => new RetrySettings(4, 30, 1800, 0.0),
-                Channel::Sms->value     => new RetrySettings(3, 15, 600,  0.0),
+                Channel::Email->value => new RetrySettings(4, 30, 1800, 0.0),
+                Channel::Sms->value => new RetrySettings(3, 15, 600, 0.0),
             ],
             randomizer: new Randomizer(new Mt19937($seed)),
         );

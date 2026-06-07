@@ -15,7 +15,7 @@ final class DomainEventTest extends TestCase
 {
     public function test_notification_requested_event_name_is_snake_case(): void
     {
-        $n      = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $events = $n->pullPendingEvents();
 
         self::assertCount(1, $events);
@@ -24,7 +24,7 @@ final class DomainEventTest extends TestCase
 
     public function test_event_name_contains_only_lowercase_letters_and_underscores(): void
     {
-        $n      = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $events = $n->pullPendingEvents();
 
         foreach ($events as $event) {
@@ -34,7 +34,7 @@ final class DomainEventTest extends TestCase
 
     public function test_event_name_does_not_start_or_end_with_underscore(): void
     {
-        $n      = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $events = $n->pullPendingEvents();
 
         foreach ($events as $event) {
@@ -46,7 +46,7 @@ final class DomainEventTest extends TestCase
 
     public function test_all_events_carry_occurred_at(): void
     {
-        $n      = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $events = $n->pullPendingEvents();
 
         foreach ($events as $event) {
@@ -56,7 +56,7 @@ final class DomainEventTest extends TestCase
 
     public function test_all_events_carry_correlation_id(): void
     {
-        $n      = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $events = $n->pullPendingEvents();
 
         foreach ($events as $event) {
@@ -97,7 +97,7 @@ final class DomainEventTest extends TestCase
             NotificationMother::later(30),
         );
 
-        $eventNames = array_map(fn($e) => $e->eventName(), $n->pullPendingEvents());
+        $eventNames = array_map(fn ($e) => $e->eventName(), $n->pullPendingEvents());
 
         self::assertContains('notification_dead_lettered', $eventNames);
     }

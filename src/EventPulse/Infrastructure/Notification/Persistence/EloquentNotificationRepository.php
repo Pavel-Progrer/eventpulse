@@ -107,17 +107,17 @@ final class EloquentNotificationRepository implements NotificationRepository
         EloquentNotification::query()->updateOrCreate(
             ['id' => $notification->id()->toString()],
             [
-                'api_key_id'      => $notification->apiKeyId(),
-                'channel'         => $notification->channel()->value,
-                'recipient'       => $notification->recipient()->toString(),
-                'priority'        => $notification->priority()->value,
-                'payload'         => $notification->payload()->toArray(),
-                'status'          => $notification->status()->value,
-                'correlation_id'  => $notification->correlationId()->toString(),
+                'api_key_id' => $notification->apiKeyId(),
+                'channel' => $notification->channel()->value,
+                'recipient' => $notification->recipient()->toString(),
+                'priority' => $notification->priority()->value,
+                'payload' => $notification->payload()->toArray(),
+                'status' => $notification->status()->value,
+                'correlation_id' => $notification->correlationId()->toString(),
                 'idempotency_key' => $notification->idempotencyKey()->toString(),
-                'replay_of_id'    => $notification->replayOf()?->toString(),
-                'created_at'      => $notification->createdAt(),
-                'updated_at'      => $notification->createdAt(),
+                'replay_of_id' => $notification->replayOf()?->toString(),
+                'created_at' => $notification->createdAt(),
+                'updated_at' => $notification->createdAt(),
             ],
         );
     }
@@ -129,18 +129,18 @@ final class EloquentNotificationRepository implements NotificationRepository
         foreach ($notification->attempts() as $attempt) {
             $payload = [
                 'notification_id' => $notificationId,
-                'number'          => $attempt->number()->toInt(),
-                'started_at'      => $attempt->startedAt(),
-                'completed_at'    => $attempt->completedAt(),
-                'succeeded'       => $attempt->succeeded(),
-                'classification'  => $attempt->failureClassification()?->value,
-                'reason'          => $attempt->failureReason(),
+                'number' => $attempt->number()->toInt(),
+                'started_at' => $attempt->startedAt(),
+                'completed_at' => $attempt->completedAt(),
+                'succeeded' => $attempt->succeeded(),
+                'classification' => $attempt->failureClassification()?->value,
+                'reason' => $attempt->failureReason(),
             ];
 
             EloquentAttempt::query()->updateOrCreate(
                 [
                     'notification_id' => $notificationId,
-                    'number'          => $attempt->number()->toInt(),
+                    'number' => $attempt->number()->toInt(),
                 ],
                 $payload,
             );
@@ -158,10 +158,10 @@ final class EloquentNotificationRepository implements NotificationRepository
         EloquentDeadLetterMark::query()->updateOrCreate(
             ['notification_id' => $notification->id()->toString()],
             [
-                'reason'                 => $mark->reason(),
-                'dead_lettered_at'       => $mark->deadLetteredAt(),
+                'reason' => $mark->reason(),
+                'dead_lettered_at' => $mark->deadLetteredAt(),
                 'replay_notification_id' => $mark->replayNotificationId()?->toString(),
-                'replayed_at'            => $mark->replayedAt(),
+                'replayed_at' => $mark->replayedAt(),
             ],
         );
     }
@@ -172,24 +172,24 @@ final class EloquentNotificationRepository implements NotificationRepository
 
     private function hydrate(EloquentNotification $row): Notification
     {
-        $channel  = Channel::from($row->channel);
+        $channel = Channel::from($row->channel);
         $attempts = $this->loadAttempts($row->id);
-        $mark     = $this->loadDeadLetterMark($row->id);
+        $mark = $this->loadDeadLetterMark($row->id);
 
         return Notification::reconstitute(
-            id:             NotificationId::fromString($row->id),
-            channel:        $channel,
-            recipient:      $this->reconstituteRecipient($channel, $row->recipient),
-            payload:        NotificationPayload::forChannel($row->payload, $channel),
-            priority:       Priority::from($row->priority),
+            id: NotificationId::fromString($row->id),
+            channel: $channel,
+            recipient: $this->reconstituteRecipient($channel, $row->recipient),
+            payload: NotificationPayload::forChannel($row->payload, $channel),
+            priority: Priority::from($row->priority),
             idempotencyKey: IdempotencyKey::fromString($row->idempotency_key),
-            apiKeyId:       $row->api_key_id,
-            createdAt:      $this->toUtc($row->created_at),
-            status:         NotificationStatus::from($row->status),
-            correlationId:  CorrelationId::fromString($row->correlation_id),
-            attempts:       $attempts,
+            apiKeyId: $row->api_key_id,
+            createdAt: $this->toUtc($row->created_at),
+            status: NotificationStatus::from($row->status),
+            correlationId: CorrelationId::fromString($row->correlation_id),
+            attempts: $attempts,
             deadLetterMark: $mark,
-            replayOf:       $row->replay_of_id === null
+            replayOf: $row->replay_of_id === null
                 ? null
                 : NotificationId::fromString($row->replay_of_id),
         );
@@ -200,7 +200,7 @@ final class EloquentNotificationRepository implements NotificationRepository
      */
     private function loadAttempts(string $notificationId): array
     {
-        $rows     = EloquentAttempt::query()
+        $rows = EloquentAttempt::query()
             ->where('notification_id', $notificationId)
             ->orderBy('number')
             ->get();
@@ -218,8 +218,8 @@ final class EloquentNotificationRepository implements NotificationRepository
             } elseif ($row->succeeded === false) {
                 $attempt->recordFailure(
                     classification: FailureClassification::from((string) $row->classification),
-                    reason:         (string) $row->reason,
-                    completedAt:    $this->toUtc($row->completed_at),
+                    reason: (string) $row->reason,
+                    completedAt: $this->toUtc($row->completed_at),
                 );
             }
 
@@ -240,7 +240,7 @@ final class EloquentNotificationRepository implements NotificationRepository
         }
 
         $mark = new DeadLetterMark(
-            reason:         $row->reason,
+            reason: $row->reason,
             deadLetteredAt: $this->toUtc($row->dead_lettered_at),
         );
 
@@ -257,8 +257,8 @@ final class EloquentNotificationRepository implements NotificationRepository
     private function reconstituteRecipient(Channel $channel, string $raw): Recipient
     {
         return match ($channel) {
-            Channel::Email   => EmailRecipient::fromString($raw),
-            Channel::Sms     => SmsRecipient::fromE164($raw),
+            Channel::Email => EmailRecipient::fromString($raw),
+            Channel::Sms => SmsRecipient::fromE164($raw),
             Channel::Webhook => WebhookRecipient::fromDestinationId($raw),
         };
     }

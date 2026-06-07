@@ -53,14 +53,14 @@ final class SubmitNotificationDispatchTest extends SubmitNotificationFeatureTest
 
         Bus::assertDispatched(
             DispatchNotificationJob::class,
-            static fn(DispatchNotificationJob $job): bool => $job->notificationId === $persistedId,
+            static fn (DispatchNotificationJob $job): bool => $job->notificationId === $persistedId,
         );
     }
 
     #[Test]
     public function high_priority_routes_to_the_high_queue(): void
     {
-        $body             = $this->validEmailBody();
+        $body = $this->validEmailBody();
         $body['priority'] = 'high';
 
         $this->postJson(
@@ -71,8 +71,7 @@ final class SubmitNotificationDispatchTest extends SubmitNotificationFeatureTest
 
         Bus::assertDispatched(
             DispatchNotificationJob::class,
-            static fn(DispatchNotificationJob $job): bool
-                => $job->queue === 'notifications-high',
+            static fn (DispatchNotificationJob $job): bool => $job->queue === 'notifications-high',
         );
     }
 
@@ -87,15 +86,14 @@ final class SubmitNotificationDispatchTest extends SubmitNotificationFeatureTest
 
         Bus::assertDispatched(
             DispatchNotificationJob::class,
-            static fn(DispatchNotificationJob $job): bool
-                => $job->queue === 'notifications-default',
+            static fn (DispatchNotificationJob $job): bool => $job->queue === 'notifications-default',
         );
     }
 
     #[Test]
     public function low_priority_routes_to_the_low_queue(): void
     {
-        $body             = $this->validEmailBody();
+        $body = $this->validEmailBody();
         $body['priority'] = 'low';
 
         $this->postJson(
@@ -106,8 +104,7 @@ final class SubmitNotificationDispatchTest extends SubmitNotificationFeatureTest
 
         Bus::assertDispatched(
             DispatchNotificationJob::class,
-            static fn(DispatchNotificationJob $job): bool
-                => $job->queue === 'notifications-low',
+            static fn (DispatchNotificationJob $job): bool => $job->queue === 'notifications-low',
         );
     }
 
@@ -120,14 +117,13 @@ final class SubmitNotificationDispatchTest extends SubmitNotificationFeatureTest
             $this->headersFor(
                 $this->writerKey,
                 idempotencyKey: 'idem-dispatch-006',
-                correlationId:  'req_correlation_xyz_789',
+                correlationId: 'req_correlation_xyz_789',
             ),
         )->assertStatus(202);
 
         Bus::assertDispatched(
             DispatchNotificationJob::class,
-            static fn(DispatchNotificationJob $job): bool
-                => $job->correlationId === 'req_correlation_xyz_789',
+            static fn (DispatchNotificationJob $job): bool => $job->correlationId === 'req_correlation_xyz_789',
         );
     }
 }

@@ -24,7 +24,7 @@ namespace EventPulse\Application\Notification\DeadLetter\Query;
 final readonly class DlqEntryPage
 {
     /**
-     * @param list<DlqEntry> $entries
+     * @param  list<DlqEntry>  $entries
      */
     public function __construct(
         public array $entries,

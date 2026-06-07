@@ -30,6 +30,7 @@ abstract class SubmitNotificationFeatureTestCase extends TestCase
     use RefreshDatabase;
 
     protected ApiKey $writerKey;
+
     protected ApiKey $otherWriterKey;
 
     protected function setUp(): void
@@ -40,16 +41,16 @@ abstract class SubmitNotificationFeatureTestCase extends TestCase
 
         $this->writerKey = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_004a',
-            'scopes'     => ['notifications:write', 'notifications:read'],
-            'status'     => 'active',
-            'label'      => 'day-4 test writer A',
+            'scopes' => ['notifications:write', 'notifications:read'],
+            'status' => 'active',
+            'label' => 'day-4 test writer A',
         ]);
 
         $this->otherWriterKey = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_004b',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'day-4 test writer B',
+            'scopes' => ['notifications:write'],
+            'status' => 'active',
+            'label' => 'day-4 test writer B',
         ]);
     }
 
@@ -59,10 +60,10 @@ abstract class SubmitNotificationFeatureTestCase extends TestCase
     protected function validEmailBody(): array
     {
         return [
-            'channel'   => 'email',
+            'channel' => 'email',
             'recipient' => 'user@example.com',
-            'payload'   => [
-                'subject'   => 'Day-4 integration test',
+            'payload' => [
+                'subject' => 'Day-4 integration test',
                 'body_text' => 'Body text for the integration test.',
             ],
         ];
@@ -77,7 +78,7 @@ abstract class SubmitNotificationFeatureTestCase extends TestCase
         ?string $correlationId = null,
     ): array {
         $headers = [
-            'Authorization'   => "Bearer {$key->identifier}",
+            'Authorization' => "Bearer {$key->identifier}",
             'Idempotency-Key' => $idempotencyKey,
         ];
 

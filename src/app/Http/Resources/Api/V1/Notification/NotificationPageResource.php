@@ -41,7 +41,7 @@ final class NotificationPageResource extends JsonResource
         $page = $this->resource;
 
         return [
-            'data'       => array_map(
+            'data' => array_map(
                 static fn (Notification $n): array => NotificationResource::make($n)->toArray($request),
                 $page->items,
             ),

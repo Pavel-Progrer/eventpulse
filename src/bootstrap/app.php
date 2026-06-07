@@ -23,10 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // handle this — let Laravel render its default." Anything non-null
         // short-circuits the rest of the pipeline.
         $exceptions->render(function (Throwable $e, Request $request): mixed {
-            if (!$request->is('api/*')) {
+            if (! $request->is('api/*')) {
                 return null;
             }
 
-            return (new ApiExceptionRenderer())->render($request, $e);
+            return (new ApiExceptionRenderer)->render($request, $e);
         });
     })->create();

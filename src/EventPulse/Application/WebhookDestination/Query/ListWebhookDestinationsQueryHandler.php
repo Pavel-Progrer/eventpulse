@@ -33,8 +33,8 @@ final class ListWebhookDestinationsQueryHandler
 
         $rows = $this->repository->listForApiKey(
             apiKeyId: $query->apiKeyId,
-            limit:    $limit,
-            afterId:  $query->afterId,
+            limit: $limit,
+            afterId: $query->afterId,
         );
 
         // Over-fetch by one means count > limit implies a next page exists.
@@ -50,7 +50,7 @@ final class ListWebhookDestinationsQueryHandler
 
         return new ListWebhookDestinationsResult(
             destinations: $rows,
-            nextCursor:   $nextCursor,
+            nextCursor: $nextCursor,
         );
     }
 }

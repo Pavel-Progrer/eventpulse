@@ -20,7 +20,7 @@ namespace EventPulse\Domain\WebhookDestination\Enum;
  */
 enum WebhookDestinationStatus: string
 {
-    case Active   = 'active';
+    case Active = 'active';
     case Disabled = 'disabled';
 
     public function isActive(): bool
@@ -31,7 +31,7 @@ enum WebhookDestinationStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Active   => 'Active',
+            self::Active => 'Active',
             self::Disabled => 'Disabled',
         };
     }

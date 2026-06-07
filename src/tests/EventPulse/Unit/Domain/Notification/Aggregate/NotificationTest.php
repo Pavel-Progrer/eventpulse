@@ -49,7 +49,7 @@ final class NotificationTest extends TestCase
     public function test_request_assigns_provided_id(): void
     {
         $id = NotificationId::generate();
-        $n  = NotificationMother::emailNotification(id: $id);
+        $n = NotificationMother::emailNotification(id: $id);
 
         self::assertTrue($id->equals($n->id()));
     }
@@ -86,7 +86,7 @@ final class NotificationTest extends TestCase
 
     public function test_request_raises_notification_requested_event(): void
     {
-        $n      = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $events = $n->pullPendingEvents();
 
         self::assertCount(1, $events);
@@ -95,7 +95,7 @@ final class NotificationTest extends TestCase
 
     public function test_requested_event_carries_correct_channel(): void
     {
-        $n     = NotificationMother::webhookNotification();
+        $n = NotificationMother::webhookNotification();
         $event = $n->pullPendingEvents()[0];
 
         self::assertInstanceOf(NotificationRequested::class, $event);
@@ -118,15 +118,15 @@ final class NotificationTest extends TestCase
         $this->expectException(RecipientChannelMismatchException::class);
 
         Notification::request(
-            id:             NotificationId::generate(),
-            channel:        Channel::Email,
-            recipient:      SmsRecipient::fromE164('+381641234567'),
-            rawPayload:     ['subject' => 'Hi', 'text' => 'There'],
-            priority:       Priority::Normal,
+            id: NotificationId::generate(),
+            channel: Channel::Email,
+            recipient: SmsRecipient::fromE164('+381641234567'),
+            rawPayload: ['subject' => 'Hi', 'text' => 'There'],
+            priority: Priority::Normal,
             idempotencyKey: NotificationMother::idempotencyKey(),
-            apiKeyId:       'key-001',
-            correlationId:  NotificationMother::correlationId(),
-            now:            NotificationMother::now(),
+            apiKeyId: 'key-001',
+            correlationId: NotificationMother::correlationId(),
+            now: NotificationMother::now(),
         );
     }
 
@@ -135,15 +135,15 @@ final class NotificationTest extends TestCase
         $this->expectException(RecipientChannelMismatchException::class);
 
         Notification::request(
-            id:             NotificationId::generate(),
-            channel:        Channel::Webhook,
-            recipient:      EmailRecipient::fromString('user@example.com'),
-            rawPayload:     ['event' => 'ping'],
-            priority:       Priority::Normal,
+            id: NotificationId::generate(),
+            channel: Channel::Webhook,
+            recipient: EmailRecipient::fromString('user@example.com'),
+            rawPayload: ['event' => 'ping'],
+            priority: Priority::Normal,
             idempotencyKey: NotificationMother::idempotencyKey(),
-            apiKeyId:       'key-001',
-            correlationId:  NotificationMother::correlationId(),
-            now:            NotificationMother::now(),
+            apiKeyId: 'key-001',
+            correlationId: NotificationMother::correlationId(),
+            now: NotificationMother::now(),
         );
     }
 
@@ -152,15 +152,15 @@ final class NotificationTest extends TestCase
         $this->expectException(RecipientChannelMismatchException::class);
 
         Notification::request(
-            id:             NotificationId::generate(),
-            channel:        Channel::Sms,
-            recipient:      WebhookRecipient::fromDestinationId('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'),
-            rawPayload:     ['body' => 'Hello'],
-            priority:       Priority::Normal,
+            id: NotificationId::generate(),
+            channel: Channel::Sms,
+            recipient: WebhookRecipient::fromDestinationId('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'),
+            rawPayload: ['body' => 'Hello'],
+            priority: Priority::Normal,
             idempotencyKey: NotificationMother::idempotencyKey(),
-            apiKeyId:       'key-001',
-            correlationId:  NotificationMother::correlationId(),
-            now:            NotificationMother::now(),
+            apiKeyId: 'key-001',
+            correlationId: NotificationMother::correlationId(),
+            now: NotificationMother::now(),
         );
     }
 
@@ -285,8 +285,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Transient,
             'Timeout',
             maxAttempts: 3,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         self::assertSame(NotificationStatus::Queued, $n->status());
@@ -303,8 +303,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Transient,
             'Timeout',
             maxAttempts: 3,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         $events = $n->pullPendingEvents();
@@ -324,8 +324,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Transient,
             'Timeout',
             maxAttempts: 3,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         $retryEvent = $n->pullPendingEvents()[1];
@@ -346,8 +346,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Transient,
             'Timeout',
             maxAttempts: 1,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         self::assertSame(NotificationStatus::DeadLettered, $n->status());
@@ -365,8 +365,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Transient,
             'Timeout',
             maxAttempts: 1,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         $events = $n->pullPendingEvents();
@@ -395,8 +395,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Permanent,
             'Invalid recipient',
             maxAttempts: 10,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         self::assertSame(NotificationStatus::DeadLettered, $n->status());
@@ -410,8 +410,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Unrecoverable,
             'Destination deleted',
             maxAttempts: 10,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         self::assertSame(NotificationStatus::DeadLettered, $n->status());
@@ -428,8 +428,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Permanent,
             'Bad address',
             maxAttempts: 3,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
 
         $failedEvent = $n->pullPendingEvents()[0];
@@ -448,7 +448,7 @@ final class NotificationTest extends TestCase
 
         $failedAttempts = array_filter(
             $n->attempts(),
-            fn($a) => $a->succeeded() === false,
+            fn ($a) => $a->succeeded() === false,
         );
         self::assertGreaterThanOrEqual(1, count($failedAttempts));
     }
@@ -459,7 +459,7 @@ final class NotificationTest extends TestCase
 
     public function test_attempt_numbers_are_contiguous_after_multiple_retries(): void
     {
-        $n           = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $maxAttempts = 3;
 
         for ($i = 1; $i <= $maxAttempts; $i++) {
@@ -525,7 +525,7 @@ final class NotificationTest extends TestCase
 
     public function test_replay_on_dead_lettered_notification_records_replay_id(): void
     {
-        $n        = NotificationMother::deadLetteredNotification();
+        $n = NotificationMother::deadLetteredNotification();
         $replayId = NotificationId::generate();
         $n->recordReplay($replayId, NotificationMother::now());
 
@@ -543,7 +543,7 @@ final class NotificationTest extends TestCase
 
     public function test_replay_raises_notification_replayed_event(): void
     {
-        $n        = NotificationMother::deadLetteredNotification();
+        $n = NotificationMother::deadLetteredNotification();
         $replayId = NotificationId::generate();
         $n->recordReplay($replayId, NotificationMother::now());
 
@@ -554,9 +554,9 @@ final class NotificationTest extends TestCase
 
     public function test_replayed_event_carries_both_ids(): void
     {
-        $original   = NotificationMother::deadLetteredNotification();
+        $original = NotificationMother::deadLetteredNotification();
         $originalId = $original->id();
-        $replayId   = NotificationId::generate();
+        $replayId = NotificationId::generate();
 
         $original->recordReplay($replayId, NotificationMother::now());
 
@@ -592,19 +592,19 @@ final class NotificationTest extends TestCase
         $original = NotificationMother::emailNotification();
 
         $reconstituted = Notification::reconstitute(
-            id:             $original->id(),
-            channel:        $original->channel(),
-            recipient:      $original->recipient(),
-            payload:        $original->payload(),
-            priority:       $original->priority(),
+            id: $original->id(),
+            channel: $original->channel(),
+            recipient: $original->recipient(),
+            payload: $original->payload(),
+            priority: $original->priority(),
             idempotencyKey: $original->idempotencyKey(),
-            apiKeyId:       $original->apiKeyId(),
-            createdAt:      $original->createdAt(),
-            status:         NotificationStatus::Queued,
-            correlationId:  $original->correlationId(),
-            attempts:       [],
+            apiKeyId: $original->apiKeyId(),
+            createdAt: $original->createdAt(),
+            status: NotificationStatus::Queued,
+            correlationId: $original->correlationId(),
+            attempts: [],
             deadLetterMark: null,
-            replayOf:       null,
+            replayOf: null,
         );
 
         self::assertEmpty($reconstituted->pullPendingEvents());
@@ -615,19 +615,19 @@ final class NotificationTest extends TestCase
         $original = NotificationMother::emailNotification();
 
         $reconstituted = Notification::reconstitute(
-            id:             $original->id(),
-            channel:        $original->channel(),
-            recipient:      $original->recipient(),
-            payload:        $original->payload(),
-            priority:       $original->priority(),
+            id: $original->id(),
+            channel: $original->channel(),
+            recipient: $original->recipient(),
+            payload: $original->payload(),
+            priority: $original->priority(),
             idempotencyKey: $original->idempotencyKey(),
-            apiKeyId:       $original->apiKeyId(),
-            createdAt:      $original->createdAt(),
-            status:         NotificationStatus::Queued,
-            correlationId:  $original->correlationId(),
-            attempts:       [],
+            apiKeyId: $original->apiKeyId(),
+            createdAt: $original->createdAt(),
+            status: NotificationStatus::Queued,
+            correlationId: $original->correlationId(),
+            attempts: [],
             deadLetterMark: null,
-            replayOf:       null,
+            replayOf: null,
         );
 
         self::assertTrue($original->id()->equals($reconstituted->id()));
@@ -645,16 +645,16 @@ final class NotificationTest extends TestCase
         $originalId = NotificationId::generate();
 
         $replay = Notification::request(
-            id:             NotificationId::generate(),
-            channel:        Channel::Email,
-            recipient:      EmailRecipient::fromString('user@example.com'),
-            rawPayload:     ['subject' => 'Retry', 'text' => 'Please retry'],
-            priority:       Priority::Normal,
+            id: NotificationId::generate(),
+            channel: Channel::Email,
+            recipient: EmailRecipient::fromString('user@example.com'),
+            rawPayload: ['subject' => 'Retry', 'text' => 'Please retry'],
+            priority: Priority::Normal,
             idempotencyKey: NotificationMother::idempotencyKey('replay-key-001'),
-            apiKeyId:       'key-001',
-            correlationId:  NotificationMother::correlationId(),
-            now:            NotificationMother::now(),
-            replayOf:       $originalId,
+            apiKeyId: 'key-001',
+            correlationId: NotificationMother::correlationId(),
+            now: NotificationMother::now(),
+            replayOf: $originalId,
         );
 
         self::assertNotNull($replay->replayOf());
@@ -683,8 +683,8 @@ final class NotificationTest extends TestCase
             FailureClassification::Transient,
             'Timeout',
             maxAttempts: 3,
-            now:         NotificationMother::now(),
-            retryAfter:  NotificationMother::later(30),
+            now: NotificationMother::now(),
+            retryAfter: NotificationMother::later(30),
         );
         self::assertSame(NotificationStatus::Queued, $n->status());
 
@@ -704,7 +704,7 @@ final class NotificationTest extends TestCase
 
     public function test_full_lifecycle_dead_lettered_after_exhausting_all_attempts(): void
     {
-        $n           = NotificationMother::emailNotification();
+        $n = NotificationMother::emailNotification();
         $maxAttempts = 3;
 
         for ($i = 0; $i < $maxAttempts; $i++) {

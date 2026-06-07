@@ -85,24 +85,24 @@ final class EmailChannelDriver implements ChannelDriver
         // so reaching this branch means the aggregate was constructed
         // through a path that bypassed `Notification::request()` —
         // a programming error we surface, not a delivery failure.
-        if (!$request->recipient instanceof EmailRecipient) {
+        if (! $request->recipient instanceof EmailRecipient) {
             throw new \LogicException(sprintf(
                 'EmailChannelDriver received a %s recipient; expected EmailRecipient.',
                 $request->recipient::class,
             ));
         }
 
-        $payload  = $request->payload->toArray();
-        $subject  = $payload['subject'];
+        $payload = $request->payload->toArray();
+        $subject = $payload['subject'];
         $bodyText = isset($payload['text']) && $payload['text'] !== '' ? (string) $payload['text'] : null;
         $bodyHtml = isset($payload['html']) && $payload['html'] !== '' ? (string) $payload['html'] : null;
 
         $logContext = [
-            'event'             => 'notification.email.dispatch',
-            'notification_id'   => $request->notificationId->toString(),
-            'attempt_number'    => $request->attemptNumber->toInt(),
+            'event' => 'notification.email.dispatch',
+            'notification_id' => $request->notificationId->toString(),
+            'attempt_number' => $request->attemptNumber->toInt(),
             'recipient_address' => $request->recipient->toString(),
-            'correlation_id'    => $request->correlationId->toString(),
+            'correlation_id' => $request->correlationId->toString(),
         ];
 
         try {
@@ -132,13 +132,13 @@ final class EmailChannelDriver implements ChannelDriver
 
             $this->logger->warning('notification.email.dispatch_failed', $logContext + [
                 'exception_class' => $e::class,
-                'reason'          => $e->getMessage(),
-                'classification'  => $classification->value,
+                'reason' => $e->getMessage(),
+                'classification' => $classification->value,
             ]);
 
             return DispatchOutcome::failure(
                 classification: $classification,
-                reason:         sprintf('%s: %s', $e::class, $e->getMessage()),
+                reason: sprintf('%s: %s', $e::class, $e->getMessage()),
             );
         }
 

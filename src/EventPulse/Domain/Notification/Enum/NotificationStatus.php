@@ -19,11 +19,11 @@ namespace EventPulse\Domain\Notification\Enum;
  */
 enum NotificationStatus: string
 {
-    case Queued       = 'queued';
-    case Processing   = 'processing';
-    case Dispatched   = 'dispatched';
+    case Queued = 'queued';
+    case Processing = 'processing';
+    case Dispatched = 'dispatched';
     case DeadLettered = 'dead_lettered';
-    case Failed       = 'failed';
+    case Failed = 'failed';
 
     /**
      * Terminal states will never transition to anything else (invariant 5.1.6).
@@ -31,9 +31,9 @@ enum NotificationStatus: string
      */
     public function isTerminal(): bool
     {
-        return match($this) {
+        return match ($this) {
             self::Dispatched, self::Failed => true,
-            default                        => false,
+            default => false,
         };
     }
 
@@ -48,11 +48,11 @@ enum NotificationStatus: string
      */
     public function canTransitionTo(self $next): bool
     {
-        return match($this) {
-            self::Queued     => $next === self::Processing,
+        return match ($this) {
+            self::Queued => $next === self::Processing,
             self::Processing => in_array($next, [self::Dispatched, self::Queued, self::Failed], true),
             // Terminal states and dead_lettered allow no further transitions.
-            default          => false,
+            default => false,
         };
     }
 }
