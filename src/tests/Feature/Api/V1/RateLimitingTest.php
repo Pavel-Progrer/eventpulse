@@ -43,7 +43,9 @@ final class RateLimitingTest extends TestCase
     use RefreshDatabase;
 
     private ApiKey $defaultKey;
+
     private ApiKey $customLimitKey;
+
     private ApiKey $otherKey;
 
     protected function setUp(): void
@@ -51,23 +53,23 @@ final class RateLimitingTest extends TestCase
         parent::setUp();
 
         $this->defaultKey = ApiKey::query()->create([
-            'identifier'            => 'ep_live_rl_default_001',
-            'scopes'                => ['notifications:write', 'notifications:read', 'dlq:read'],
-            'status'                => 'active',
+            'identifier' => 'ep_live_rl_default_001',
+            'scopes' => ['notifications:write', 'notifications:read', 'dlq:read'],
+            'status' => 'active',
             'rate_limit_per_minute' => null, // system default
         ]);
 
         $this->customLimitKey = ApiKey::query()->create([
-            'identifier'            => 'ep_live_rl_custom_001',
-            'scopes'                => ['notifications:write', 'notifications:read', 'dlq:read'],
-            'status'                => 'active',
+            'identifier' => 'ep_live_rl_custom_001',
+            'scopes' => ['notifications:write', 'notifications:read', 'dlq:read'],
+            'status' => 'active',
             'rate_limit_per_minute' => 2, // very low for test determinism
         ]);
 
         $this->otherKey = ApiKey::query()->create([
-            'identifier'            => 'ep_live_rl_other_001',
-            'scopes'                => ['notifications:write', 'notifications:read', 'dlq:read'],
-            'status'                => 'active',
+            'identifier' => 'ep_live_rl_other_001',
+            'scopes' => ['notifications:write', 'notifications:read', 'dlq:read'],
+            'status' => 'active',
             'rate_limit_per_minute' => null,
         ]);
     }
@@ -79,10 +81,10 @@ final class RateLimitingTest extends TestCase
         // explicit clearing is safer when tests run in the same process.
         $limiter = $this->app->make(RateLimiter::class);
         $limiter->clear(sprintf('eventpulse:rl:%s:write', $this->defaultKey->id));
-        $limiter->clear(sprintf('eventpulse:rl:%s:read',  $this->defaultKey->id));
+        $limiter->clear(sprintf('eventpulse:rl:%s:read', $this->defaultKey->id));
         $limiter->clear(sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id));
         $limiter->clear(sprintf('eventpulse:rl:%s:write', $this->otherKey->id));
-        $limiter->clear(sprintf('eventpulse:rl:%s:read',  $this->otherKey->id));
+        $limiter->clear(sprintf('eventpulse:rl:%s:read', $this->otherKey->id));
 
         parent::tearDown();
     }
@@ -93,7 +95,7 @@ final class RateLimitingTest extends TestCase
     public function successful_read_response_carries_rate_limit_headers(): void
     {
         $response = $this->withBearerToken($this->defaultKey->identifier)
-                         ->getJson('/api/v1/dlq');
+            ->getJson('/api/v1/dlq');
 
         $response->assertStatus(200);
         $response->assertHeader('X-RateLimit-Limit');
@@ -105,7 +107,7 @@ final class RateLimitingTest extends TestCase
     public function read_limit_header_reflects_the_600_default(): void
     {
         $response = $this->withBearerToken($this->defaultKey->identifier)
-                         ->getJson('/api/v1/dlq');
+            ->getJson('/api/v1/dlq');
 
         $response->assertStatus(200);
         self::assertSame('600', $response->headers->get('X-RateLimit-Limit'));
@@ -115,12 +117,12 @@ final class RateLimitingTest extends TestCase
     public function remaining_decrements_with_each_request(): void
     {
         $first = $this->withBearerToken($this->defaultKey->identifier)
-                      ->getJson('/api/v1/dlq');
+            ->getJson('/api/v1/dlq');
 
         $second = $this->withBearerToken($this->defaultKey->identifier)
-                       ->getJson('/api/v1/dlq');
+            ->getJson('/api/v1/dlq');
 
-        $firstRemaining  = (int) $first->headers->get('X-RateLimit-Remaining');
+        $firstRemaining = (int) $first->headers->get('X-RateLimit-Remaining');
         $secondRemaining = (int) $second->headers->get('X-RateLimit-Remaining');
 
         self::assertLessThan($firstRemaining, $secondRemaining);
@@ -133,8 +135,8 @@ final class RateLimitingTest extends TestCase
     {
         // Pre-fill the write bucket to the per-key limit so the next request
         // is blocked. Using `hit()` directly avoids making 100 real HTTP calls.
-        $limiter    = $this->app->make(RateLimiter::class);
-        $bucketKey  = sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id);
+        $limiter = $this->app->make(RateLimiter::class);
+        $bucketKey = sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id);
 
         // Custom limit is 2; hit it twice to exhaust.
         $limiter->hit($bucketKey, 60);
@@ -142,7 +144,7 @@ final class RateLimitingTest extends TestCase
 
         // The next (third) write should be blocked.
         $response = $this->withBearerToken($this->customLimitKey->identifier)
-                         ->postJson('/api/v1/notifications', []);
+            ->postJson('/api/v1/notifications', []);
 
         $response->assertStatus(429);
         $response->assertJsonStructure([
@@ -154,14 +156,14 @@ final class RateLimitingTest extends TestCase
     #[Test]
     public function rate_limited_response_includes_retry_after_header(): void
     {
-        $limiter   = $this->app->make(RateLimiter::class);
+        $limiter = $this->app->make(RateLimiter::class);
         $bucketKey = sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id);
 
         $limiter->hit($bucketKey, 60);
         $limiter->hit($bucketKey, 60);
 
         $response = $this->withBearerToken($this->customLimitKey->identifier)
-                         ->postJson('/api/v1/notifications', []);
+            ->postJson('/api/v1/notifications', []);
 
         $response->assertStatus(429);
         $response->assertHeader('Retry-After');
@@ -171,7 +173,7 @@ final class RateLimitingTest extends TestCase
     #[Test]
     public function correlation_id_is_propagated_to_rate_limited_response(): void
     {
-        $limiter   = $this->app->make(RateLimiter::class);
+        $limiter = $this->app->make(RateLimiter::class);
         $bucketKey = sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id);
 
         $limiter->hit($bucketKey, 60);
@@ -180,8 +182,8 @@ final class RateLimitingTest extends TestCase
         $correlationId = 'test-correlation-abc-123';
 
         $response = $this->withBearerToken($this->customLimitKey->identifier)
-                         ->withHeaders(['X-Correlation-ID' => $correlationId])
-                         ->postJson('/api/v1/notifications', []);
+            ->withHeaders(['X-Correlation-ID' => $correlationId])
+            ->postJson('/api/v1/notifications', []);
 
         $response->assertStatus(429);
         $response->assertJsonPath('correlation_id', $correlationId);
@@ -194,7 +196,7 @@ final class RateLimitingTest extends TestCase
     {
         // First request succeeds; the limit header should show the override (2).
         $response = $this->withBearerToken($this->customLimitKey->identifier)
-                         ->getJson('/api/v1/dlq');
+            ->getJson('/api/v1/dlq');
 
         // GET is a read → uses default 600 limit (per-key override is write-only).
         // Confirming the read bucket is NOT affected by the write override.
@@ -205,7 +207,7 @@ final class RateLimitingTest extends TestCase
     #[Test]
     public function write_override_blocks_at_custom_limit_not_default(): void
     {
-        $limiter   = $this->app->make(RateLimiter::class);
+        $limiter = $this->app->make(RateLimiter::class);
         $bucketKey = sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id);
 
         // Hit the custom limit (2) exactly — next write should be blocked.
@@ -213,7 +215,7 @@ final class RateLimitingTest extends TestCase
         $limiter->hit($bucketKey, 60);
 
         $response = $this->withBearerToken($this->customLimitKey->identifier)
-                         ->postJson('/api/v1/notifications', []);
+            ->postJson('/api/v1/notifications', []);
 
         // 429 at 3rd write (limit = 2), NOT at the 101st (limit = 100 default).
         $response->assertStatus(429);
@@ -225,7 +227,7 @@ final class RateLimitingTest extends TestCase
     #[Test]
     public function exhausted_write_bucket_does_not_block_reads(): void
     {
-        $limiter    = $this->app->make(RateLimiter::class);
+        $limiter = $this->app->make(RateLimiter::class);
         $writeBucket = sprintf('eventpulse:rl:%s:write', $this->customLimitKey->id);
 
         $limiter->hit($writeBucket, 60);
@@ -233,13 +235,13 @@ final class RateLimitingTest extends TestCase
 
         // Write is now blocked.
         $this->withBearerToken($this->customLimitKey->identifier)
-             ->postJson('/api/v1/notifications', [])
-             ->assertStatus(429);
+            ->postJson('/api/v1/notifications', [])
+            ->assertStatus(429);
 
         // Read must still work.
         $this->withBearerToken($this->customLimitKey->identifier)
-             ->getJson('/api/v1/dlq')
-             ->assertStatus(200);
+            ->getJson('/api/v1/dlq')
+            ->assertStatus(200);
     }
 
     #[Test]
@@ -254,13 +256,13 @@ final class RateLimitingTest extends TestCase
 
         // Custom key is blocked.
         $this->withBearerToken($this->customLimitKey->identifier)
-             ->postJson('/api/v1/notifications', [])
-             ->assertStatus(429);
+            ->postJson('/api/v1/notifications', [])
+            ->assertStatus(429);
 
         // The other key's write bucket is untouched — it should not be blocked.
         // (The request will likely 422 on validation, not 429 — that's fine.)
         $response = $this->withBearerToken($this->otherKey->identifier)
-                         ->postJson('/api/v1/notifications', []);
+            ->postJson('/api/v1/notifications', []);
 
         self::assertNotEquals(429, $response->getStatusCode());
     }
@@ -273,7 +275,7 @@ final class RateLimitingTest extends TestCase
         // Before Day 10, unknown routes returned Laravel's HTML 404.
         // After Day 10, the ApiExceptionRenderer intercepts NotFoundHttpException.
         $response = $this->withBearerToken($this->defaultKey->identifier)
-                         ->getJson('/api/v1/does-not-exist');
+            ->getJson('/api/v1/does-not-exist');
 
         $response->assertStatus(404);
         $response->assertJsonPath('error.code', 'NOT_FOUND');
@@ -284,6 +286,6 @@ final class RateLimitingTest extends TestCase
 
     private function withBearerToken(string $identifier): static
     {
-        return $this->withHeaders(['Authorization' => 'Bearer ' . $identifier]);
+        return $this->withHeaders(['Authorization' => 'Bearer '.$identifier]);
     }
 }

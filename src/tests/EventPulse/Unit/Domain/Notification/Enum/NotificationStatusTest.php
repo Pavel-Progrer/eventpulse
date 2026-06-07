@@ -99,33 +99,33 @@ final class NotificationStatusTest extends TestCase
     {
         return [
             // Queued cannot skip to terminal or dead-letter directly
-            'queued → dispatched'         => [NotificationStatus::Queued, NotificationStatus::Dispatched],
-            'queued → dead_lettered'      => [NotificationStatus::Queued, NotificationStatus::DeadLettered],
-            'queued → failed'             => [NotificationStatus::Queued, NotificationStatus::Failed],
-            'queued → queued'             => [NotificationStatus::Queued, NotificationStatus::Queued],
+            'queued → dispatched' => [NotificationStatus::Queued, NotificationStatus::Dispatched],
+            'queued → dead_lettered' => [NotificationStatus::Queued, NotificationStatus::DeadLettered],
+            'queued → failed' => [NotificationStatus::Queued, NotificationStatus::Failed],
+            'queued → queued' => [NotificationStatus::Queued, NotificationStatus::Queued],
 
             // Terminal: dispatched cannot go anywhere
-            'dispatched → queued'         => [NotificationStatus::Dispatched, NotificationStatus::Queued],
-            'dispatched → processing'     => [NotificationStatus::Dispatched, NotificationStatus::Processing],
-            'dispatched → dead_lettered'  => [NotificationStatus::Dispatched, NotificationStatus::DeadLettered],
-            'dispatched → failed'         => [NotificationStatus::Dispatched, NotificationStatus::Failed],
-            'dispatched → dispatched'     => [NotificationStatus::Dispatched, NotificationStatus::Dispatched],
+            'dispatched → queued' => [NotificationStatus::Dispatched, NotificationStatus::Queued],
+            'dispatched → processing' => [NotificationStatus::Dispatched, NotificationStatus::Processing],
+            'dispatched → dead_lettered' => [NotificationStatus::Dispatched, NotificationStatus::DeadLettered],
+            'dispatched → failed' => [NotificationStatus::Dispatched, NotificationStatus::Failed],
+            'dispatched → dispatched' => [NotificationStatus::Dispatched, NotificationStatus::Dispatched],
 
             // Terminal: failed cannot go anywhere
-            'failed → queued'             => [NotificationStatus::Failed, NotificationStatus::Queued],
-            'failed → processing'         => [NotificationStatus::Failed, NotificationStatus::Processing],
-            'failed → dispatched'         => [NotificationStatus::Failed, NotificationStatus::Dispatched],
-            'failed → dead_lettered'      => [NotificationStatus::Failed, NotificationStatus::DeadLettered],
-            'failed → failed'             => [NotificationStatus::Failed, NotificationStatus::Failed],
+            'failed → queued' => [NotificationStatus::Failed, NotificationStatus::Queued],
+            'failed → processing' => [NotificationStatus::Failed, NotificationStatus::Processing],
+            'failed → dispatched' => [NotificationStatus::Failed, NotificationStatus::Dispatched],
+            'failed → dead_lettered' => [NotificationStatus::Failed, NotificationStatus::DeadLettered],
+            'failed → failed' => [NotificationStatus::Failed, NotificationStatus::Failed],
 
             // dead_lettered cannot transition back into the lifecycle
-            'dead_lettered → queued'      => [NotificationStatus::DeadLettered, NotificationStatus::Queued],
-            'dead_lettered → processing'  => [NotificationStatus::DeadLettered, NotificationStatus::Processing],
-            'dead_lettered → dispatched'  => [NotificationStatus::DeadLettered, NotificationStatus::Dispatched],
-            'dead_lettered → failed'      => [NotificationStatus::DeadLettered, NotificationStatus::Failed],
+            'dead_lettered → queued' => [NotificationStatus::DeadLettered, NotificationStatus::Queued],
+            'dead_lettered → processing' => [NotificationStatus::DeadLettered, NotificationStatus::Processing],
+            'dead_lettered → dispatched' => [NotificationStatus::DeadLettered, NotificationStatus::Dispatched],
+            'dead_lettered → failed' => [NotificationStatus::DeadLettered, NotificationStatus::Failed],
 
             // processing cannot self-transition
-            'processing → processing'     => [NotificationStatus::Processing, NotificationStatus::Processing],
+            'processing → processing' => [NotificationStatus::Processing, NotificationStatus::Processing],
         ];
     }
 }

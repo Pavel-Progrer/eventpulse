@@ -39,7 +39,7 @@ final class NotificationResource extends JsonResource
 
     public static function makeWithPayload(Notification $notification): self
     {
-        $resource                 = static::make($notification);
+        $resource = self::make($notification);
         $resource->includePayload = true;
 
         return $resource;
@@ -53,17 +53,17 @@ final class NotificationResource extends JsonResource
         $n = $this->resource;
 
         $data = [
-            'id'              => $n->id()->toString(),
-            'channel'         => $n->channel()->value,
-            'recipient'       => $n->recipient()->toString(),
-            'priority'        => $n->priority()->value,
-            'status'          => $n->status()->value,
+            'id' => $n->id()->toString(),
+            'channel' => $n->channel()->value,
+            'recipient' => $n->recipient()->toString(),
+            'priority' => $n->priority()->value,
+            'status' => $n->status()->value,
             'idempotency_key' => $n->idempotencyKey()->toString(),
-            'correlation_id'  => $n->correlationId()->toString(),
-            'replay_of_id'    => $n->replayOf()?->toString(),
-            'created_at'      => $n->createdAt()->format(DateTimeInterface::ATOM),
-            'dispatched_at'   => $this->deriveDispatchedAt($n),
-            'attempts'        => $this->renderAttempts($n),
+            'correlation_id' => $n->correlationId()->toString(),
+            'replay_of_id' => $n->replayOf()?->toString(),
+            'created_at' => $n->createdAt()->format(DateTimeInterface::ATOM),
+            'dispatched_at' => $this->deriveDispatchedAt($n),
+            'attempts' => $this->renderAttempts($n),
         ];
 
         if ($this->includePayload) {
@@ -98,12 +98,12 @@ final class NotificationResource extends JsonResource
     {
         return array_map(
             static fn (Attempt $a): array => [
-                'number'         => $a->number()->toInt(),
-                'started_at'     => $a->startedAt()->format(DateTimeInterface::ATOM),
-                'completed_at'   => $a->completedAt()?->format(DateTimeInterface::ATOM),
-                'succeeded'      => $a->succeeded(),
+                'number' => $a->number()->toInt(),
+                'started_at' => $a->startedAt()->format(DateTimeInterface::ATOM),
+                'completed_at' => $a->completedAt()?->format(DateTimeInterface::ATOM),
+                'succeeded' => $a->succeeded(),
                 'classification' => $a->failureClassification()?->value,
-                'reason'         => $a->failureReason(),
+                'reason' => $a->failureReason(),
             ],
             $n->attempts(),
         );

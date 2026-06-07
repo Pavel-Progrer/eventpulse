@@ -59,7 +59,7 @@ final class ReplayDeadLetteredHandler
 
     public function __invoke(ReplayDeadLetteredCommand $command): Notification
     {
-        $now     = $this->clock->now();
+        $now = $this->clock->now();
         $idemKey = IdempotencyKey::fromString($command->idempotencyKey);
 
         // Idempotency check comes first — before loading the original — so that
@@ -77,22 +77,22 @@ final class ReplayDeadLetteredHandler
         $original = $this->loadOriginal($command);
 
         // Create the new notification — same shape as the original.
-        $replayId    = NotificationId::generate();
+        $replayId = NotificationId::generate();
         $correlationId = $command->correlationId === null
             ? CorrelationId::generate()
             : CorrelationId::fromString($command->correlationId);
 
         $replay = Notification::request(
-            id:             $replayId,
-            channel:        $original->channel(),
-            recipient:      $original->recipient(),
-            rawPayload:     $original->payload()->toArray(),
-            priority:       $original->priority(),
+            id: $replayId,
+            channel: $original->channel(),
+            recipient: $original->recipient(),
+            rawPayload: $original->payload()->toArray(),
+            priority: $original->priority(),
             idempotencyKey: $idemKey,
-            apiKeyId:       $command->apiKeyId,
-            correlationId:  $correlationId,
-            now:            $now,
-            replayOf:       $original->id(),
+            apiKeyId: $command->apiKeyId,
+            correlationId: $correlationId,
+            now: $now,
+            replayOf: $original->id(),
         );
 
         // Mark the original as replayed. This mutates its DeadLetterMark.
@@ -116,8 +116,8 @@ final class ReplayDeadLetteredHandler
 
         $this->dispatchQueue->enqueue(
             notificationId: $replay->id(),
-            correlationId:  $replay->correlationId(),
-            priority:       $replay->priority(),
+            correlationId: $replay->correlationId(),
+            priority: $replay->priority(),
         );
 
         return $replay;

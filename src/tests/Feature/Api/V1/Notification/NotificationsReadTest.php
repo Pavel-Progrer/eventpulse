@@ -31,7 +31,9 @@ final class NotificationsReadTest extends TestCase
     use UsesNotificationFactory;
 
     private ApiKey $reader;
+
     private ApiKey $writer;
+
     private ApiKey $otherTenant;
 
     protected function setUp(): void
@@ -40,23 +42,23 @@ final class NotificationsReadTest extends TestCase
 
         $this->reader = ApiKey::query()->create([
             'identifier' => 'ep_live_notif_reader_001',
-            'scopes'     => ['notifications:read'],
-            'status'     => 'active',
-            'label'      => 'reader',
+            'scopes' => ['notifications:read'],
+            'status' => 'active',
+            'label' => 'reader',
         ]);
 
         $this->writer = ApiKey::query()->create([
             'identifier' => 'ep_live_notif_writer_001',
-            'scopes'     => ['notifications:write', 'notifications:read'],
-            'status'     => 'active',
-            'label'      => 'writer',
+            'scopes' => ['notifications:write', 'notifications:read'],
+            'status' => 'active',
+            'label' => 'writer',
         ]);
 
         $this->otherTenant = ApiKey::query()->create([
             'identifier' => 'ep_live_notif_other_001',
-            'scopes'     => ['notifications:read'],
-            'status'     => 'active',
-            'label'      => 'other tenant',
+            'scopes' => ['notifications:read'],
+            'status' => 'active',
+            'label' => 'other tenant',
         ]);
     }
 
@@ -76,9 +78,9 @@ final class NotificationsReadTest extends TestCase
     {
         $writeOnly = ApiKey::query()->create([
             'identifier' => 'ep_live_write_only_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'write only',
+            'scopes' => ['notifications:write'],
+            'status' => 'active',
+            'label' => 'write only',
         ]);
 
         $this->getJson(
@@ -94,7 +96,7 @@ final class NotificationsReadTest extends TestCase
             '/api/v1/notifications/00000000-0000-0000-0000-000000000000',
             $this->headersFor($this->reader),
         )->assertStatus(404)
-         ->assertJsonPath('error.code', 'NOT_FOUND');
+            ->assertJsonPath('error.code', 'NOT_FOUND');
     }
 
     #[Test]
@@ -104,7 +106,7 @@ final class NotificationsReadTest extends TestCase
         $notification = $this->factory()->dlqEntry($this->writer)->save();
 
         $this->getJson(
-            '/api/v1/notifications/' . $notification->id()->toString(),
+            '/api/v1/notifications/'.$notification->id()->toString(),
             $this->headersFor($this->reader),
         )->assertStatus(404);
     }
@@ -113,7 +115,7 @@ final class NotificationsReadTest extends TestCase
     public function get_returns_200_with_full_notification_shape(): void
     {
         $notification = $this->factory()->dlqEntry($this->reader)->save();
-        $id           = $notification->id()->toString();
+        $id = $notification->id()->toString();
 
         $response = $this->getJson(
             "/api/v1/notifications/{$id}",
@@ -139,7 +141,7 @@ final class NotificationsReadTest extends TestCase
             ->save();
 
         $response = $this->getJson(
-            '/api/v1/notifications/' . $notification->id()->toString(),
+            '/api/v1/notifications/'.$notification->id()->toString(),
             $this->headersFor($this->reader),
         )->assertStatus(200);
 
@@ -161,7 +163,7 @@ final class NotificationsReadTest extends TestCase
         $notification = $this->factory()->dlqEntry($this->reader)->save();
 
         $response = $this->getJson(
-            '/api/v1/notifications/' . $notification->id()->toString(),
+            '/api/v1/notifications/'.$notification->id()->toString(),
             $this->headersFor($this->reader),
         )->assertStatus(200);
 
@@ -185,9 +187,9 @@ final class NotificationsReadTest extends TestCase
     {
         $writeOnly = ApiKey::query()->create([
             'identifier' => 'ep_live_write_only_002',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'write only',
+            'scopes' => ['notifications:write'],
+            'status' => 'active',
+            'label' => 'write only',
         ]);
 
         $this->getJson(
@@ -235,14 +237,14 @@ final class NotificationsReadTest extends TestCase
             '/api/v1/notifications?status[]=dead_lettered',
             $this->headersFor($this->reader),
         )->assertStatus(200)
-         ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data');
 
         // queued filter matches nothing.
         $this->getJson(
             '/api/v1/notifications?status[]=queued',
             $this->headersFor($this->reader),
         )->assertStatus(200)
-         ->assertJsonCount(0, 'data');
+            ->assertJsonCount(0, 'data');
     }
 
     #[Test]
@@ -255,7 +257,7 @@ final class NotificationsReadTest extends TestCase
             '/api/v1/notifications?channel[]=email',
             $this->headersFor($this->reader),
         )->assertStatus(200)
-         ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data');
 
         $response->assertJsonPath('data.0.channel', 'email');
     }
@@ -349,6 +351,6 @@ final class NotificationsReadTest extends TestCase
      */
     private function headersFor(ApiKey $key): array
     {
-        return ['Authorization' => 'Bearer ' . $key->identifier];
+        return ['Authorization' => 'Bearer '.$key->identifier];
     }
 }

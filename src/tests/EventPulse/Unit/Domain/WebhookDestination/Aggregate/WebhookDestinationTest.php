@@ -28,8 +28,10 @@ use PHPUnit\Framework\TestCase;
  */
 final class WebhookDestinationTest extends TestCase
 {
-    private const string API_KEY_ID       = 'key-aaaaaa-bbbbbb';
-    private const string VALID_URL        = 'https://hooks.example.com/notify';
+    private const string API_KEY_ID = 'key-aaaaaa-bbbbbb';
+
+    private const string VALID_URL = 'https://hooks.example.com/notify';
+
     private const string DESTINATION_NAME = 'My webhook';
 
     // ---------------------------------------------------------------------------
@@ -39,7 +41,7 @@ final class WebhookDestinationTest extends TestCase
     #[Test]
     public function register_creates_active_destination_with_correct_fields(): void
     {
-        $id  = WebhookDestinationId::generate();
+        $id = WebhookDestinationId::generate();
         $now = new DateTimeImmutable('2026-04-28T12:00:00Z');
 
         $destination = $this->register(id: $id, url: self::VALID_URL, name: self::DESTINATION_NAME, now: $now);
@@ -93,8 +95,8 @@ final class WebhookDestinationTest extends TestCase
     #[Test]
     public function register_emits_webhook_destination_registered_event(): void
     {
-        $id          = WebhookDestinationId::generate();
-        $now         = new DateTimeImmutable('2026-04-28T12:00:00Z');
+        $id = WebhookDestinationId::generate();
+        $now = new DateTimeImmutable('2026-04-28T12:00:00Z');
         $destination = $this->register(id: $id, url: self::VALID_URL, name: self::DESTINATION_NAME, now: $now);
 
         $events = $destination->pullPendingEvents();
@@ -132,7 +134,7 @@ final class WebhookDestinationTest extends TestCase
         $destination = $this->register();
         $destination->pullPendingEvents(); // Consume registration event.
 
-        $destination->disable(new DateTimeImmutable(), CorrelationId::fromString('corr-1'));
+        $destination->disable(new DateTimeImmutable, CorrelationId::fromString('corr-1'));
 
         self::assertSame(WebhookDestinationStatus::Disabled, $destination->status());
         self::assertFalse($destination->isActive());
@@ -141,11 +143,11 @@ final class WebhookDestinationTest extends TestCase
     #[Test]
     public function disable_emits_webhook_destination_disabled_event(): void
     {
-        $id          = WebhookDestinationId::generate();
+        $id = WebhookDestinationId::generate();
         $destination = $this->register(id: $id);
         $destination->pullPendingEvents();
 
-        $now  = new DateTimeImmutable('2026-04-28T14:00:00Z');
+        $now = new DateTimeImmutable('2026-04-28T14:00:00Z');
         $corr = CorrelationId::fromString('corr-disable-1');
         $destination->disable($now, $corr);
 
@@ -166,12 +168,12 @@ final class WebhookDestinationTest extends TestCase
     public function disable_throws_when_already_disabled(): void
     {
         $destination = $this->register();
-        $destination->disable(new DateTimeImmutable(), CorrelationId::fromString('corr-1'));
+        $destination->disable(new DateTimeImmutable, CorrelationId::fromString('corr-1'));
         $destination->pullPendingEvents();
 
         $this->expectException(WebhookDestinationAlreadyDisabledException::class);
 
-        $destination->disable(new DateTimeImmutable(), CorrelationId::fromString('corr-2'));
+        $destination->disable(new DateTimeImmutable, CorrelationId::fromString('corr-2'));
     }
 
     // ---------------------------------------------------------------------------
@@ -181,15 +183,15 @@ final class WebhookDestinationTest extends TestCase
     #[Test]
     public function reconstitute_hydrates_state_without_raising_events(): void
     {
-        $id  = WebhookDestinationId::generate();
+        $id = WebhookDestinationId::generate();
         $now = new DateTimeImmutable('2026-04-28T10:00:00Z');
 
         $destination = WebhookDestination::reconstitute(
-            id:        $id,
-            apiKeyId:  self::API_KEY_ID,
-            url:       self::VALID_URL,
-            name:      'Reconstituted',
-            status:    WebhookDestinationStatus::Disabled,
+            id: $id,
+            apiKeyId: self::API_KEY_ID,
+            url: self::VALID_URL,
+            name: 'Reconstituted',
+            status: WebhookDestinationStatus::Disabled,
             createdAt: $now,
         );
 
@@ -203,17 +205,17 @@ final class WebhookDestinationTest extends TestCase
     // ---------------------------------------------------------------------------
 
     private function register(
-        ?WebhookDestinationId $id   = null,
-        string $url                  = self::VALID_URL,
-        ?string $name                = self::DESTINATION_NAME,
-        ?DateTimeImmutable $now      = null,
+        ?WebhookDestinationId $id = null,
+        string $url = self::VALID_URL,
+        ?string $name = self::DESTINATION_NAME,
+        ?DateTimeImmutable $now = null,
     ): WebhookDestination {
         return WebhookDestination::register(
-            id:            $id   ?? WebhookDestinationId::generate(),
-            apiKeyId:      self::API_KEY_ID,
-            url:           $url,
-            name:          $name,
-            now:           $now  ?? new DateTimeImmutable(),
+            id: $id ?? WebhookDestinationId::generate(),
+            apiKeyId: self::API_KEY_ID,
+            url: $url,
+            name: $name,
+            now: $now ?? new DateTimeImmutable,
             correlationId: CorrelationId::fromString('test-corr-1'),
         );
     }

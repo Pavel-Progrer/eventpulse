@@ -40,11 +40,11 @@ final class NotificationAcceptedResource extends JsonResource
         $result = $this->resource;
 
         return [
-            'id'             => $result->id->toString(),
-            'status'         => $result->status->value,
+            'id' => $result->id->toString(),
+            'status' => $result->status->value,
             'correlation_id' => $result->correlationId->toString(),
-            'created_at'     => $result->createdAt->format(DATE_ATOM),
-            '_links'         => [
+            'created_at' => $result->createdAt->format(DATE_ATOM),
+            '_links' => [
                 'self' => sprintf('/api/v1/notifications/%s', $result->id->toString()),
             ],
         ];

@@ -29,14 +29,14 @@ final class DlqEntryResource extends JsonResource
         $entry = $this->resource;
 
         return [
-            'id'                     => $entry->id,
-            'notification_id'        => $entry->notificationId,
-            'reason'                 => $entry->reason,
-            'channel'                => $entry->channel->value,
-            'final_attempt_at'       => $entry->finalAttemptAt?->format(\DateTimeInterface::ATOM),
-            'replayed_at'            => $entry->replayedAt?->format(\DateTimeInterface::ATOM),
+            'id' => $entry->id,
+            'notification_id' => $entry->notificationId,
+            'reason' => $entry->reason,
+            'channel' => $entry->channel->value,
+            'final_attempt_at' => $entry->finalAttemptAt?->format(\DateTimeInterface::ATOM),
+            'replayed_at' => $entry->replayedAt?->format(\DateTimeInterface::ATOM),
             'replay_notification_id' => $entry->replayNotificationId,
-            'created_at'             => $entry->deadLetteredAt->format(\DateTimeInterface::ATOM),
+            'created_at' => $entry->deadLetteredAt->format(\DateTimeInterface::ATOM),
         ];
     }
 }

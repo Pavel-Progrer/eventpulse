@@ -67,7 +67,7 @@ final class EloquentDeadLetteredNotificationsRepository implements DeadLetteredN
             $rows->pop();
         }
 
-        $entries    = $rows->map(fn (object $row): DlqEntry => $this->project($row))->values()->all();
+        $entries = $rows->map(fn (object $row): DlqEntry => $this->project($row))->values()->all();
         $nextCursor = ($hasMore && count($entries) > 0)
             ? $this->encodeCursor(end($entries))
             : null;
@@ -142,10 +142,10 @@ final class EloquentDeadLetteredNotificationsRepository implements DeadLetteredN
         // a lexicographically smaller id (DESC sort tiebreaker).
         $builder->where(static function (Builder $q) use ($deadLetteredAt, $id): void {
             $q->where('dlm.dead_lettered_at', '<', $deadLetteredAt)
-              ->orWhere(static function (Builder $q2) use ($deadLetteredAt, $id): void {
-                  $q2->where('dlm.dead_lettered_at', $deadLetteredAt)
-                     ->where('dlm.id', '<', $id);
-              });
+                ->orWhere(static function (Builder $q2) use ($deadLetteredAt, $id): void {
+                    $q2->where('dlm.dead_lettered_at', $deadLetteredAt)
+                        ->where('dlm.id', '<', $id);
+                });
         });
     }
 
@@ -154,8 +154,8 @@ final class EloquentDeadLetteredNotificationsRepository implements DeadLetteredN
         $payload = $last->deadLetteredAt
             ->setTimezone(new DateTimeZone('UTC'))
             ->format('Y-m-d H:i:s')
-            . '|'
-            . $last->id;
+            .'|'
+            .$last->id;
 
         return base64_encode($payload);
     }
@@ -163,16 +163,16 @@ final class EloquentDeadLetteredNotificationsRepository implements DeadLetteredN
     private function project(object $row): DlqEntry
     {
         return new DlqEntry(
-            id:                   $row->id,
-            notificationId:       $row->notification_id,
-            reason:               $row->reason,
-            channel:              Channel::from($row->channel),
-            deadLetteredAt:       $this->toUtc($row->dead_lettered_at),
-            finalAttemptAt:       $row->final_attempt_at !== null
+            id: $row->id,
+            notificationId: $row->notification_id,
+            reason: $row->reason,
+            channel: Channel::from($row->channel),
+            deadLetteredAt: $this->toUtc($row->dead_lettered_at),
+            finalAttemptAt: $row->final_attempt_at !== null
                                       ? $this->toUtc($row->final_attempt_at)
                                       : null,
             replayNotificationId: $row->replay_notification_id,
-            replayedAt:           $row->replayed_at !== null
+            replayedAt: $row->replayed_at !== null
                                       ? $this->toUtc($row->replayed_at)
                                       : null,
         );

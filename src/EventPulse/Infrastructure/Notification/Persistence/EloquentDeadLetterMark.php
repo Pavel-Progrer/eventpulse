@@ -6,6 +6,7 @@ namespace EventPulse\Infrastructure\Notification\Persistence;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Eloquent persistence representation of a `DeadLetterMark`.
@@ -28,15 +29,15 @@ use Illuminate\Database\Eloquent\Model;
  * filters to `WHERE discarded_at IS NULL` so acknowledged entries
  * disappear from the default view without deleting any history.
  *
- * @property string                          $id
- * @property string                          $notification_id
- * @property string                          $reason
- * @property \Illuminate\Support\Carbon      $dead_lettered_at
- * @property string|null                     $replay_notification_id
- * @property \Illuminate\Support\Carbon|null $replayed_at
- * @property \Illuminate\Support\Carbon|null $discarded_at
- * @property \Illuminate\Support\Carbon      $created_at
- * @property \Illuminate\Support\Carbon      $updated_at
+ * @property string $id
+ * @property string $notification_id
+ * @property string $reason
+ * @property Carbon $dead_lettered_at
+ * @property string|null $replay_notification_id
+ * @property Carbon|null $replayed_at
+ * @property Carbon|null $discarded_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 final class EloquentDeadLetterMark extends Model
 {
@@ -53,7 +54,7 @@ final class EloquentDeadLetterMark extends Model
 
     protected $casts = [
         'dead_lettered_at' => 'datetime',
-        'replayed_at'      => 'datetime',
-        'discarded_at'     => 'datetime',
+        'replayed_at' => 'datetime',
+        'discarded_at' => 'datetime',
     ];
 }

@@ -6,6 +6,9 @@ namespace Tests\Integration\Notification\Channel\Doubles;
 
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Mail\Message;
+use Illuminate\Mail\PendingMail;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
 
 /**
  * Recording test double for `Illuminate\Contracts\Mail\Mailer`.
@@ -29,12 +32,12 @@ final class RecordingMailer implements Mailer
 
     public ?\Throwable $throwOnNextSend = null;
 
-    public function to($users): \Illuminate\Mail\PendingMail
+    public function to($users): PendingMail
     {
         throw new \BadMethodCallException('not used by EmailChannelDriver');
     }
 
-    public function bcc($users): \Illuminate\Mail\PendingMail
+    public function bcc($users): PendingMail
     {
         throw new \BadMethodCallException('not used by EmailChannelDriver');
     }
@@ -52,8 +55,8 @@ final class RecordingMailer implements Mailer
             throw $e;
         }
 
-        $symfonyMessage = new \Symfony\Component\Mime\Email();
-        $message        = new Message($symfonyMessage);
+        $symfonyMessage = new Email;
+        $message = new Message($symfonyMessage);
 
         if (is_callable($callback)) {
             $callback($message);
@@ -62,11 +65,11 @@ final class RecordingMailer implements Mailer
         $email = $message->getSymfonyMessage();
 
         $this->sentMessages[] = [
-            'from'    => $this->addressesToArray($email->getFrom()),
-            'to'      => $this->addressesToArray($email->getTo()),
+            'from' => $this->addressesToArray($email->getFrom()),
+            'to' => $this->addressesToArray($email->getTo()),
             'subject' => (string) $email->getSubject(),
-            'html'    => $email->getHtmlBody(),
-            'text'    => $email->getTextBody(),
+            'html' => $email->getHtmlBody(),
+            'text' => $email->getTextBody(),
         ];
     }
 
@@ -78,16 +81,17 @@ final class RecordingMailer implements Mailer
     }
 
     /**
-     * @param iterable<\Symfony\Component\Mime\Address> $addresses
+     * @param  iterable<Address>  $addresses
      * @return array<string, ?string>
      */
     private function addressesToArray(iterable $addresses): array
     {
         $result = [];
         foreach ($addresses as $address) {
-            $name           = $address->getName();
+            $name = $address->getName();
             $result[$address->getAddress()] = $name === '' ? null : $name;
         }
+
         return $result;
     }
 }

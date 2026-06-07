@@ -19,7 +19,7 @@ final readonly class WebhookDestinationId
     private function __construct(
         private string $value,
     ) {
-        if (!Uuid::isValid($value)) {
+        if (! Uuid::isValid($value)) {
             throw new \InvalidArgumentException(sprintf(
                 'WebhookDestinationId must be a valid UUID; got "%s".',
                 $value,

@@ -58,12 +58,12 @@ interface NotificationDispatchQueue
      * is provided by the `findByIdempotencyKey` dedup that runs *before*
      * this is called, not by this method itself.
      *
-     * @param DateTimeImmutable|null $availableAt If non-null, the queue must
-     *   not deliver the job to a worker before this absolute timestamp.
-     *   Used by the retry path: a transient failure schedules the retry at
-     *   `now + backoff_delay`, and the worker should not pick it up early.
-     *   Day 6 introduces this parameter; the HTTP submission path leaves it
-     *   null, meaning "available immediately."
+     * @param  DateTimeImmutable|null  $availableAt  If non-null, the queue must
+     *                                               not deliver the job to a worker before this absolute timestamp.
+     *                                               Used by the retry path: a transient failure schedules the retry at
+     *                                               `now + backoff_delay`, and the worker should not pick it up early.
+     *                                               Day 6 introduces this parameter; the HTTP submission path leaves it
+     *                                               null, meaning "available immediately."
      *
      *   Why an absolute timestamp rather than a `DateInterval` delay:
      *   the retry-after timestamp is also written into the

@@ -9,6 +9,7 @@ use EventPulse\Infrastructure\WebhookDestination\Persistence\EloquentWebhookDest
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use PHPUnit\Framework\Attributes\Test;
+use Ramsey\Uuid\Uuid;
 use Tests\TestCase;
 
 /**
@@ -45,10 +46,13 @@ final class WebhookDestinationsFeatureTest extends TestCase
     use RefreshDatabase;
 
     private ApiKey $writer;
+
     private ApiKey $readOnly;
+
     private ApiKey $otherTenant;
 
-    private const string VALID_URL    = 'https://hooks.example.com/events';
+    private const string VALID_URL = 'https://hooks.example.com/events';
+
     private const string VALID_SECRET = 'my-super-secret-minimum-16chars!';
 
     protected function setUp(): void
@@ -57,23 +61,23 @@ final class WebhookDestinationsFeatureTest extends TestCase
 
         $this->writer = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_001',
-            'scopes'     => ['notifications:write', 'notifications:read'],
-            'status'     => 'active',
-            'label'      => 'writer',
+            'scopes' => ['notifications:write', 'notifications:read'],
+            'status' => 'active',
+            'label' => 'writer',
         ]);
 
         $this->readOnly = ApiKey::query()->create([
             'identifier' => 'ep_live_reader_001',
-            'scopes'     => ['notifications:read'],
-            'status'     => 'active',
-            'label'      => 'read-only',
+            'scopes' => ['notifications:read'],
+            'status' => 'active',
+            'label' => 'read-only',
         ]);
 
         $this->otherTenant = ApiKey::query()->create([
             'identifier' => 'ep_live_other_tenant_001',
-            'scopes'     => ['notifications:write', 'notifications:read'],
-            'status'     => 'active',
-            'label'      => 'other tenant',
+            'scopes' => ['notifications:write', 'notifications:read'],
+            'status' => 'active',
+            'label' => 'other tenant',
         ]);
     }
 
@@ -109,7 +113,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
             $body,
             $this->headersFor($this->writer),
         )->assertStatus(422)
-          ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
     }
 
     #[Test]
@@ -120,7 +124,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
             [...$this->validBody(), 'url' => 'http://insecure.example.com/hook'],
             $this->headersFor($this->writer),
         )->assertStatus(422)
-          ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
     }
 
     #[Test]
@@ -144,7 +148,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
             $body,
             $this->headersFor($this->writer),
         )->assertStatus(422)
-          ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
     }
 
     #[Test]
@@ -172,7 +176,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
             $this->headersFor($this->writer),
         )->assertStatus(201);
 
-        $id    = $response->json('id');
+        $id = $response->json('id');
         $model = EloquentWebhookDestination::find($id);
 
         self::assertNotNull($model);
@@ -200,9 +204,9 @@ final class WebhookDestinationsFeatureTest extends TestCase
     {
         $writerOnlyKey = ApiKey::query()->create([
             'identifier' => 'ep_live_write_only_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'write-only',
+            'scopes' => ['notifications:write'],
+            'status' => 'active',
+            'label' => 'write-only',
         ]);
 
         $this->getJson(
@@ -218,8 +222,8 @@ final class WebhookDestinationsFeatureTest extends TestCase
             '/api/v1/webhook-destinations',
             $this->headersFor($this->writer),
         )->assertOk()
-          ->assertJsonPath('data', [])
-          ->assertJsonPath('meta.next_cursor', null);
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.next_cursor', null);
     }
 
     #[Test]
@@ -306,7 +310,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
     #[Test]
     public function disable_returns_401_without_bearer_token(): void
     {
-        $this->deleteJson('/api/v1/webhook-destinations/' . \Ramsey\Uuid\Uuid::uuid4()->toString())
+        $this->deleteJson('/api/v1/webhook-destinations/'.Uuid::uuid4()->toString())
             ->assertStatus(401);
     }
 
@@ -314,7 +318,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
     public function disable_returns_403_when_caller_lacks_write_scope(): void
     {
         $this->deleteJson(
-            '/api/v1/webhook-destinations/' . \Ramsey\Uuid\Uuid::uuid4()->toString(),
+            '/api/v1/webhook-destinations/'.Uuid::uuid4()->toString(),
             [],
             $this->headersFor($this->readOnly),
         )->assertStatus(403);
@@ -324,11 +328,11 @@ final class WebhookDestinationsFeatureTest extends TestCase
     public function disable_returns_404_for_unknown_id(): void
     {
         $this->deleteJson(
-            '/api/v1/webhook-destinations/' . \Ramsey\Uuid\Uuid::uuid4()->toString(),
+            '/api/v1/webhook-destinations/'.Uuid::uuid4()->toString(),
             [],
             $this->headersFor($this->writer),
         )->assertStatus(404)
-          ->assertJsonPath('error.code', 'NOT_FOUND');
+            ->assertJsonPath('error.code', 'NOT_FOUND');
     }
 
     #[Test]
@@ -397,7 +401,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
             [],
             $this->headersFor($this->writer),
         )->assertStatus(409)
-          ->assertJsonPath('error.code', 'ALREADY_DISABLED');
+            ->assertJsonPath('error.code', 'ALREADY_DISABLED');
     }
 
     // =========================================================================
@@ -410,9 +414,9 @@ final class WebhookDestinationsFeatureTest extends TestCase
     private function validBody(): array
     {
         return [
-            'url'    => self::VALID_URL,
+            'url' => self::VALID_URL,
             'secret' => self::VALID_SECRET,
-            'name'   => 'Test hook',
+            'name' => 'Test hook',
         ];
     }
 
@@ -423,7 +427,7 @@ final class WebhookDestinationsFeatureTest extends TestCase
     {
         return [
             'Authorization' => "Bearer {$key->identifier}",
-            'Accept'        => 'application/json',
+            'Accept' => 'application/json',
         ];
     }
 }

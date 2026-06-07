@@ -37,7 +37,9 @@ final class GetDlqTest extends TestCase
     use UsesNotificationFactory;
 
     private ApiKey $reader;
+
     private ApiKey $otherTenant;
+
     private ApiKey $writeOnly;
 
     protected function setUp(): void
@@ -46,23 +48,23 @@ final class GetDlqTest extends TestCase
 
         $this->reader = ApiKey::query()->create([
             'identifier' => 'ep_live_dlq_reader_001',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader A',
+            'scopes' => ['dlq:read'],
+            'status' => 'active',
+            'label' => 'reader A',
         ]);
 
         $this->otherTenant = ApiKey::query()->create([
             'identifier' => 'ep_live_dlq_reader_002',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader B',
+            'scopes' => ['dlq:read'],
+            'status' => 'active',
+            'label' => 'reader B',
         ]);
 
         $this->writeOnly = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_only_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'writer with no DLQ access',
+            'scopes' => ['notifications:write'],
+            'status' => 'active',
+            'label' => 'writer with no DLQ access',
         ]);
     }
 
@@ -73,7 +75,7 @@ final class GetDlqTest extends TestCase
     #[Test]
     public function returns_401_without_a_bearer_token(): void
     {
-        $this->getJson('/api/v1/dlq/' . Str::uuid()->toString())
+        $this->getJson('/api/v1/dlq/'.Str::uuid()->toString())
             ->assertStatus(401);
     }
 
@@ -81,7 +83,7 @@ final class GetDlqTest extends TestCase
     public function returns_403_when_the_api_key_lacks_dlq_read_scope(): void
     {
         $this->getJson(
-            '/api/v1/dlq/' . Str::uuid()->toString(),
+            '/api/v1/dlq/'.Str::uuid()->toString(),
             $this->headersFor($this->writeOnly),
         )->assertStatus(403);
     }
@@ -113,15 +115,15 @@ final class GetDlqTest extends TestCase
         )->assertOk();
 
         // Outer DlqEntry shape.
-        $response->assertJsonPath('id',                     $id);
-        $response->assertJsonPath('notification_id',        $id);
-        $response->assertJsonPath('reason',                 'max_retries_exceeded');
-        $response->assertJsonPath('channel',                'email');
+        $response->assertJsonPath('id', $id);
+        $response->assertJsonPath('notification_id', $id);
+        $response->assertJsonPath('reason', 'max_retries_exceeded');
+        $response->assertJsonPath('channel', 'email');
         $response->assertJsonPath('replay_notification_id', null);
-        $response->assertJsonPath('replayed_at',            null);
+        $response->assertJsonPath('replayed_at', null);
 
         // Embedded notification.
-        $response->assertJsonPath('notification.id',     $id);
+        $response->assertJsonPath('notification.id', $id);
         $response->assertJsonPath('notification.status', 'dead_lettered');
         $response->assertJsonPath('notification.channel', 'email');
 
@@ -152,7 +154,7 @@ final class GetDlqTest extends TestCase
     public function returns_404_for_a_nonexistent_id(): void
     {
         $this->getJson(
-            '/api/v1/dlq/' . Str::uuid()->toString(),
+            '/api/v1/dlq/'.Str::uuid()->toString(),
             $this->headersFor($this->reader),
         )
             ->assertStatus(404)
@@ -184,18 +186,18 @@ final class GetDlqTest extends TestCase
         // the caller, no dead-letter mark. The handler must refuse it.
         $id = Str::uuid()->toString();
         DB::table('notifications')->insert([
-            'id'              => $id,
-            'api_key_id'      => $this->reader->id,
-            'channel'         => 'email',
-            'recipient'       => 'someone@example.test',
-            'priority'        => 'normal',
-            'payload'         => json_encode(['subject' => 'Hi', 'text' => 'Body.']),
-            'status'          => 'queued',
-            'correlation_id'  => 'corr-' . $id,
-            'idempotency_key' => 'idem-' . $id,
-            'replay_of_id'    => null,
-            'created_at'      => '2026-04-27T10:00:00Z',
-            'updated_at'      => '2026-04-27T10:00:00Z',
+            'id' => $id,
+            'api_key_id' => $this->reader->id,
+            'channel' => 'email',
+            'recipient' => 'someone@example.test',
+            'priority' => 'normal',
+            'payload' => json_encode(['subject' => 'Hi', 'text' => 'Body.']),
+            'status' => 'queued',
+            'correlation_id' => 'corr-'.$id,
+            'idempotency_key' => 'idem-'.$id,
+            'replay_of_id' => null,
+            'created_at' => '2026-04-27T10:00:00Z',
+            'updated_at' => '2026-04-27T10:00:00Z',
         ]);
 
         $this->getJson("/api/v1/dlq/{$id}", $this->headersFor($this->reader))
@@ -222,7 +224,7 @@ final class GetDlqTest extends TestCase
     {
         return [
             'Authorization' => "Bearer {$key->identifier}",
-            'Accept'        => 'application/json',
+            'Accept' => 'application/json',
         ];
     }
 }

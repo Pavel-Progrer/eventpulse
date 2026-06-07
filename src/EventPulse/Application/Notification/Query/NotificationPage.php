@@ -17,7 +17,7 @@ use EventPulse\Domain\Notification\Aggregate\Notification;
 final readonly class NotificationPage
 {
     /**
-     * @param list<Notification> $items
+     * @param  list<Notification>  $items
      */
     public function __construct(
         public array $items,

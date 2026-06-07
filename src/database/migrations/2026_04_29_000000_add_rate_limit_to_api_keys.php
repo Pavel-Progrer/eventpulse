@@ -26,7 +26,8 @@ use Illuminate\Support\Facades\Schema;
  * (`ThrottleApiRequests`) rather than a DB check constraint to keep the
  * migration simple and portable across PostgreSQL versions.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::table('api_keys', function (Blueprint $table): void {

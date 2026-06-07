@@ -86,11 +86,11 @@ final class WebhookDestination
             );
         }
 
-        if (!str_starts_with($url, 'https://')) {
+        if (! str_starts_with($url, 'https://')) {
             throw new \InvalidArgumentException(sprintf(
                 'Webhook destination URL must use https://; got "%s". '
-                . 'HTTP endpoints are rejected (domain.md §5.2.2): the system signs '
-                . 'deliveries and relies on TLS to protect the payload in transit.',
+                .'HTTP endpoints are rejected (domain.md §5.2.2): the system signs '
+                .'deliveries and relies on TLS to protect the payload in transit.',
                 $url,
             ));
         }
@@ -102,20 +102,20 @@ final class WebhookDestination
         }
 
         $destination = new self(
-            id:        $id,
-            apiKeyId:  $apiKeyId,
-            url:       $url,
-            name:      $name,
-            status:    WebhookDestinationStatus::Active,
+            id: $id,
+            apiKeyId: $apiKeyId,
+            url: $url,
+            name: $name,
+            status: WebhookDestinationStatus::Active,
             createdAt: $now,
         );
 
         $destination->recordEvent(new WebhookDestinationRegistered(
             destinationId: $id,
-            apiKeyId:      $apiKeyId,
-            url:           $url,
-            name:          $name,
-            occurredAt:    $now,
+            apiKeyId: $apiKeyId,
+            url: $url,
+            name: $name,
+            occurredAt: $now,
             correlationId: $correlationId,
         ));
 
@@ -139,7 +139,7 @@ final class WebhookDestination
      */
     public function disable(DateTimeImmutable $now, CorrelationId $correlationId): void
     {
-        if (!$this->status->canDisable()) {
+        if (! $this->status->canDisable()) {
             throw new WebhookDestinationAlreadyDisabledException(
                 sprintf(
                     'WebhookDestination %s is already disabled and cannot be disabled again.',
@@ -152,8 +152,8 @@ final class WebhookDestination
 
         $this->recordEvent(new WebhookDestinationDisabled(
             destinationId: $this->id,
-            apiKeyId:      $this->apiKeyId,
-            occurredAt:    $now,
+            apiKeyId: $this->apiKeyId,
+            occurredAt: $now,
             correlationId: $correlationId,
         ));
     }
@@ -174,11 +174,11 @@ final class WebhookDestination
         DateTimeImmutable $createdAt,
     ): self {
         return new self(
-            id:        $id,
-            apiKeyId:  $apiKeyId,
-            url:       $url,
-            name:      $name,
-            status:    $status,
+            id: $id,
+            apiKeyId: $apiKeyId,
+            url: $url,
+            name: $name,
+            status: $status,
             createdAt: $createdAt,
         );
     }
@@ -197,7 +197,7 @@ final class WebhookDestination
      */
     public function pullPendingEvents(): array
     {
-        $events              = $this->pendingEvents;
+        $events = $this->pendingEvents;
         $this->pendingEvents = [];
 
         return $events;

@@ -21,7 +21,7 @@ final class SmsRecipient extends Recipient
 
     public static function fromE164(string $phoneNumber): self
     {
-        if (!preg_match('/^\+[1-9]\d{1,14}$/', $phoneNumber)) {
+        if (! preg_match('/^\+[1-9]\d{1,14}$/', $phoneNumber)) {
             throw new InvalidNotificationInputException(
                 sprintf('"%s" is not a valid E.164 phone number.', $phoneNumber)
             );

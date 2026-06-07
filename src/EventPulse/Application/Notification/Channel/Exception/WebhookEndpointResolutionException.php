@@ -45,28 +45,28 @@ final class WebhookEndpointResolutionException extends \RuntimeException
     public static function notFound(WebhookRecipient $recipient): self
     {
         return new self(
-            recipient:      $recipient,
+            recipient: $recipient,
             classification: FailureClassification::Unrecoverable,
-            reason:         'destination does not exist (it may have been deleted).',
+            reason: 'destination does not exist (it may have been deleted).',
         );
     }
 
     public static function disabled(WebhookRecipient $recipient): self
     {
         return new self(
-            recipient:      $recipient,
+            recipient: $recipient,
             classification: FailureClassification::Permanent,
-            reason:         'destination is disabled and not accepting deliveries.',
+            reason: 'destination is disabled and not accepting deliveries.',
         );
     }
 
     public static function notConfigured(WebhookRecipient $recipient): self
     {
         return new self(
-            recipient:      $recipient,
+            recipient: $recipient,
             classification: FailureClassification::Unrecoverable,
-            reason:         'webhook endpoint resolution is not configured in this build '
-                          . '(see UnconfiguredWebhookEndpointResolver). Day 9 enables this.',
+            reason: 'webhook endpoint resolution is not configured in this build '
+                          .'(see UnconfiguredWebhookEndpointResolver). Day 9 enables this.',
         );
     }
 }

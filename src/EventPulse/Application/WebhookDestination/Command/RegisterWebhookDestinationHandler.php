@@ -38,18 +38,18 @@ final class RegisterWebhookDestinationHandler
 
     public function __invoke(RegisterWebhookDestinationCommand $command): RegisterWebhookDestinationResult
     {
-        $id            = WebhookDestinationId::generate();
-        $now           = $this->clock->now();
+        $id = WebhookDestinationId::generate();
+        $now = $this->clock->now();
         $correlationId = $command->correlationId === null
             ? CorrelationId::generate()
             : CorrelationId::fromString($command->correlationId);
 
         $destination = WebhookDestination::register(
-            id:            $id,
-            apiKeyId:      $command->apiKeyId,
-            url:           $command->url,
-            name:          $command->name,
-            now:           $now,
+            id: $id,
+            apiKeyId: $command->apiKeyId,
+            url: $command->url,
+            name: $command->name,
+            now: $now,
             correlationId: $correlationId,
         );
 
@@ -60,11 +60,11 @@ final class RegisterWebhookDestinationHandler
         }
 
         return new RegisterWebhookDestinationResult(
-            id:        $destination->id(),
-            url:       $destination->url(),
-            name:      $destination->name(),
-            secret:    $command->secret,
-            status:    $destination->status(),
+            id: $destination->id(),
+            url: $destination->url(),
+            name: $destination->name(),
+            secret: $command->secret,
+            status: $destination->status(),
             createdAt: $destination->createdAt(),
         );
     }

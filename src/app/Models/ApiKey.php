@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Persistence representation of the ApiKey aggregate.
@@ -19,14 +20,14 @@ use Illuminate\Database\Eloquent\Model;
  * Laravel construct; the domain aggregate (when implemented later) lives
  * under `src/EventPulse/Domain/ApiKey/`.
  *
- * @property string                           $id
- * @property string                           $identifier
- * @property string|null                      $secret_hash
- * @property array<int, string>               $scopes
- * @property string                           $status
- * @property string|null                      $label
- * @property int|null                         $rate_limit_per_minute
- * @property \Illuminate\Support\Carbon|null  $revoked_at
+ * @property string $id
+ * @property string $identifier
+ * @property string|null $secret_hash
+ * @property array<int, string> $scopes
+ * @property string $status
+ * @property string|null $label
+ * @property int|null $rate_limit_per_minute
+ * @property Carbon|null $revoked_at
  */
 final class ApiKey extends Model
 {
@@ -50,9 +51,9 @@ final class ApiKey extends Model
     ];
 
     protected $casts = [
-        'scopes'                 => 'array',
-        'rate_limit_per_minute'  => 'integer',
-        'revoked_at'             => 'datetime',
+        'scopes' => 'array',
+        'rate_limit_per_minute' => 'integer',
+        'revoked_at' => 'datetime',
     ];
 
     /**
@@ -79,6 +80,6 @@ final class ApiKey extends Model
      */
     protected function isRevoked(): Attribute
     {
-        return Attribute::get(fn(): bool => $this->status === 'revoked');
+        return Attribute::get(fn (): bool => $this->status === 'revoked');
     }
 }

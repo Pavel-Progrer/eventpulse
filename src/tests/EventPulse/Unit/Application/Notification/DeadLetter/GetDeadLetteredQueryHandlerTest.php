@@ -16,10 +16,10 @@ use EventPulse\Domain\Notification\ValueObject\CorrelationId;
 use EventPulse\Domain\Notification\ValueObject\EmailRecipient;
 use EventPulse\Domain\Notification\ValueObject\IdempotencyKey;
 use EventPulse\Domain\Notification\ValueObject\NotificationId;
+use EventPulse\Tests\Unit\Application\Support\InMemoryNotificationRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use EventPulse\Tests\Unit\Application\Support\InMemoryNotificationRepository;
 
 /**
  * Coverage for the get-DLQ-detail use case.
@@ -42,14 +42,15 @@ use EventPulse\Tests\Unit\Application\Support\InMemoryNotificationRepository;
 final class GetDeadLetteredQueryHandlerTest extends TestCase
 {
     private InMemoryNotificationRepository $repository;
+
     private GetDeadLetteredQueryHandler $handler;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->repository = new InMemoryNotificationRepository();
-        $this->handler    = new GetDeadLetteredQueryHandler($this->repository);
+        $this->repository = new InMemoryNotificationRepository;
+        $this->handler = new GetDeadLetteredQueryHandler($this->repository);
     }
 
     #[Test]
@@ -60,7 +61,7 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
 
         $result = ($this->handler)(new GetDeadLetteredQuery(
             notificationId: $notification->id()->toString(),
-            apiKeyId:       'key-a',
+            apiKeyId: 'key-a',
         ));
 
         self::assertSame($notification, $result);
@@ -73,7 +74,7 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
 
         ($this->handler)(new GetDeadLetteredQuery(
             notificationId: NotificationId::generate()->toString(),
-            apiKeyId:       'key-a',
+            apiKeyId: 'key-a',
         ));
     }
 
@@ -87,7 +88,7 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
 
         ($this->handler)(new GetDeadLetteredQuery(
             notificationId: $notification->id()->toString(),
-            apiKeyId:       'key-b', // tenant B asking about A's row
+            apiKeyId: 'key-b', // tenant B asking about A's row
         ));
     }
 
@@ -104,7 +105,7 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
 
         ($this->handler)(new GetDeadLetteredQuery(
             notificationId: $queued->id()->toString(),
-            apiKeyId:       'key-a',
+            apiKeyId: 'key-a',
         ));
     }
 
@@ -119,10 +120,10 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
         $notification->beginAttempt($now);
         $notification->recordFailure(
             classification: FailureClassification::Permanent,
-            reason:         'destination rejected',
-            maxAttempts:    1,
-            now:            $now->modify('+30 seconds'),
-            retryAfter:     $now->modify('+1 minute'),
+            reason: 'destination rejected',
+            maxAttempts: 1,
+            now: $now->modify('+30 seconds'),
+            retryAfter: $now->modify('+1 minute'),
         );
 
         // Drain pending events — the aggregate's tests cover them.
@@ -134,19 +135,19 @@ final class GetDeadLetteredQueryHandlerTest extends TestCase
     private function makeQueuedNotification(string $apiKeyId): Notification
     {
         return Notification::request(
-            id:             NotificationId::generate(),
-            channel:        Channel::Email,
+            id: NotificationId::generate(),
+            channel: Channel::Email,
             // Payload uses the email shape NotificationPayload validates:
             // a non-empty `subject` and at least one of `text` or `html`.
             // (Earlier draft used `body`, which the validator rejects —
             // that was the cause of three errors in the Day-8 first run.)
-            recipient:      EmailRecipient::fromString('alice@example.test'),
-            rawPayload:     ['subject' => 'Hi', 'text' => 'Hello.'],
-            priority:       Priority::Normal,
+            recipient: EmailRecipient::fromString('alice@example.test'),
+            rawPayload: ['subject' => 'Hi', 'text' => 'Hello.'],
+            priority: Priority::Normal,
             idempotencyKey: IdempotencyKey::fromString('idem-getdlq-test-001'),
-            apiKeyId:       $apiKeyId,
-            correlationId:  CorrelationId::generate(),
-            now:            new DateTimeImmutable('2026-04-27T09:00:00Z'),
+            apiKeyId: $apiKeyId,
+            correlationId: CorrelationId::generate(),
+            now: new DateTimeImmutable('2026-04-27T09:00:00Z'),
         );
     }
 }

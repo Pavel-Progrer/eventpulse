@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace EventPulse\Domain\Notification\ValueObject;
 
-
 /**
  * Abstract base for the typed Recipient hierarchy (domain.md §7).
  *

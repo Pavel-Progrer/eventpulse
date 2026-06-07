@@ -33,7 +33,7 @@ final class DisableWebhookDestinationHandler
 
     public function __invoke(DisableWebhookDestinationCommand $command): void
     {
-        $id          = WebhookDestinationId::fromString($command->destinationId);
+        $id = WebhookDestinationId::fromString($command->destinationId);
         $destination = $this->repository->findById($id, $command->apiKeyId);
 
         if ($destination === null) {
@@ -45,7 +45,7 @@ final class DisableWebhookDestinationHandler
             : CorrelationId::fromString($command->correlationId);
 
         $destination->disable(
-            now:           $this->clock->now(),
+            now: $this->clock->now(),
             correlationId: $correlationId,
         );
 

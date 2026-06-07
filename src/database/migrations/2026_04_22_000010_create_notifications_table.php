@@ -41,7 +41,8 @@ use Illuminate\Support\Facades\Schema;
  *  - All timestamps are `TIMESTAMPTZ` (UTC). The column type names align
  *    with `SystemClock::now()` (`UTC`); see ADR-0003 §6.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('notifications', function (Blueprint $table): void {

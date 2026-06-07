@@ -57,15 +57,15 @@ final class ListDlqRequest extends FormRequest
             // a 422 for a future-valid value.
             'reason' => ['sometimes', 'string', 'in:max_retries_exceeded,unrecoverable_error,manual'],
 
-            'channel' => ['sometimes', 'string', 'in:' . implode(',', array_map(
-                static fn(Channel $c): string => $c->value,
+            'channel' => ['sometimes', 'string', 'in:'.implode(',', array_map(
+                static fn (Channel $c): string => $c->value,
                 Channel::cases(),
             ))],
 
-            'created_after'  => ['sometimes', 'date'],
+            'created_after' => ['sometimes', 'date'],
             'created_before' => ['sometimes', 'date'],
 
-            'limit'  => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'cursor' => ['sometimes', 'string', 'min:1', 'max:255'],
         ];
     }

@@ -8,6 +8,7 @@ use EventPulse\Application\Notification\Channel\ChannelDispatcher;
 use EventPulse\Application\Notification\Channel\DispatchOutcome;
 use EventPulse\Application\Notification\Channel\Exception\NoDriverForChannelException;
 use EventPulse\Domain\Notification\Enum\Channel;
+use EventPulse\Domain\Notification\Enum\FailureClassification;
 use EventPulse\Tests\Unit\Application\Notification\Channel\Doubles\FakeChannelDriver;
 use EventPulse\Tests\Unit\Domain\Notification\Support\NotificationMother;
 use LogicException;
@@ -27,14 +28,14 @@ final class ChannelDispatcherTest extends TestCase
     #[Test]
     public function dispatcher_routes_to_the_driver_for_the_notifications_channel(): void
     {
-        $email   = new FakeChannelDriver(Channel::Email,   DispatchOutcome::success());
+        $email = new FakeChannelDriver(Channel::Email, DispatchOutcome::success());
         $webhook = new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success());
-        $sms     = new FakeChannelDriver(Channel::Sms,     DispatchOutcome::success());
+        $sms = new FakeChannelDriver(Channel::Sms, DispatchOutcome::success());
 
         $dispatcher = new ChannelDispatcher([$email, $webhook, $sms]);
 
         $notification = NotificationMother::emailNotification();
-        $attempt      = $notification->beginAttempt(NotificationMother::now());
+        $attempt = $notification->beginAttempt(NotificationMother::now());
 
         $outcome = $dispatcher->dispatch($notification, $attempt);
 
@@ -47,15 +48,15 @@ final class ChannelDispatcherTest extends TestCase
     #[Test]
     public function driver_for_returns_the_registered_driver_for_each_channel(): void
     {
-        $email   = new FakeChannelDriver(Channel::Email,   DispatchOutcome::success());
+        $email = new FakeChannelDriver(Channel::Email, DispatchOutcome::success());
         $webhook = new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success());
-        $sms     = new FakeChannelDriver(Channel::Sms,     DispatchOutcome::success());
+        $sms = new FakeChannelDriver(Channel::Sms, DispatchOutcome::success());
 
         $dispatcher = new ChannelDispatcher([$email, $webhook, $sms]);
 
-        self::assertSame($email,   $dispatcher->driverFor(Channel::Email));
+        self::assertSame($email, $dispatcher->driverFor(Channel::Email));
         self::assertSame($webhook, $dispatcher->driverFor(Channel::Webhook));
-        self::assertSame($sms,     $dispatcher->driverFor(Channel::Sms));
+        self::assertSame($sms, $dispatcher->driverFor(Channel::Sms));
     }
 
     #[Test]
@@ -69,7 +70,7 @@ final class ChannelDispatcherTest extends TestCase
         $this->expectExceptionMessage('No ChannelDriver registered for channel "sms"');
 
         new ChannelDispatcher([
-            new FakeChannelDriver(Channel::Email,   DispatchOutcome::success()),
+            new FakeChannelDriver(Channel::Email, DispatchOutcome::success()),
             new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success()),
         ]);
     }
@@ -85,10 +86,10 @@ final class ChannelDispatcherTest extends TestCase
         $this->expectExceptionMessage('Two ChannelDrivers registered for channel "email"');
 
         new ChannelDispatcher([
-            new FakeChannelDriver(Channel::Email,   DispatchOutcome::success()),
-            new FakeChannelDriver(Channel::Email,   DispatchOutcome::success()),
+            new FakeChannelDriver(Channel::Email, DispatchOutcome::success()),
+            new FakeChannelDriver(Channel::Email, DispatchOutcome::success()),
             new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success()),
-            new FakeChannelDriver(Channel::Sms,     DispatchOutcome::success()),
+            new FakeChannelDriver(Channel::Sms, DispatchOutcome::success()),
         ]);
     }
 
@@ -96,8 +97,8 @@ final class ChannelDispatcherTest extends TestCase
     public function dispatch_returns_the_outcome_produced_by_the_driver(): void
     {
         $configuredOutcome = DispatchOutcome::failure(
-            classification: \EventPulse\Domain\Notification\Enum\FailureClassification::Transient,
-            reason:         'simulated transport failure',
+            classification: FailureClassification::Transient,
+            reason: 'simulated transport failure',
         );
 
         $email = new FakeChannelDriver(Channel::Email, $configuredOutcome);
@@ -105,11 +106,11 @@ final class ChannelDispatcherTest extends TestCase
         $dispatcher = new ChannelDispatcher([
             $email,
             new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success()),
-            new FakeChannelDriver(Channel::Sms,     DispatchOutcome::success()),
+            new FakeChannelDriver(Channel::Sms, DispatchOutcome::success()),
         ]);
 
         $notification = NotificationMother::emailNotification();
-        $attempt      = $notification->beginAttempt(NotificationMother::now());
+        $attempt = $notification->beginAttempt(NotificationMother::now());
 
         $outcome = $dispatcher->dispatch($notification, $attempt);
 
@@ -124,11 +125,11 @@ final class ChannelDispatcherTest extends TestCase
         $dispatcher = new ChannelDispatcher([
             $email,
             new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success()),
-            new FakeChannelDriver(Channel::Sms,     DispatchOutcome::success()),
+            new FakeChannelDriver(Channel::Sms, DispatchOutcome::success()),
         ]);
 
         $notification = NotificationMother::emailNotification();
-        $attempt      = $notification->beginAttempt(NotificationMother::now());
+        $attempt = $notification->beginAttempt(NotificationMother::now());
 
         $dispatcher->dispatch($notification, $attempt);
 
@@ -148,7 +149,7 @@ final class ChannelDispatcherTest extends TestCase
         // dispatcher's `driverFor` is part of the public API and the
         // contract says "throws on missing driver."
         $reflection = new \ReflectionClass(ChannelDispatcher::class);
-        $instance   = $reflection->newInstanceWithoutConstructor();
+        $instance = $reflection->newInstanceWithoutConstructor();
 
         $property = $reflection->getProperty('driversByChannel');
         $property->setValue($instance, []);

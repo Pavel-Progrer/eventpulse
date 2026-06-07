@@ -9,6 +9,7 @@ use App\Models\ApiKey;
 use EventPulse\Infrastructure\Notification\Persistence\EloquentNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -27,7 +28,9 @@ final class SubmitNotificationTest extends TestCase
     use RefreshDatabase;
 
     private ApiKey $writerKey;
+
     private ApiKey $readOnlyKey;
+
     private ApiKey $revokedKey;
 
     protected function setUp(): void
@@ -38,24 +41,24 @@ final class SubmitNotificationTest extends TestCase
 
         $this->writerKey = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_001',
-            'scopes'     => ['notifications:write', 'notifications:read'],
-            'status'     => 'active',
-            'label'      => 'test writer',
+            'scopes' => ['notifications:write', 'notifications:read'],
+            'status' => 'active',
+            'label' => 'test writer',
         ]);
 
         $this->readOnlyKey = ApiKey::query()->create([
             'identifier' => 'ep_live_reader_001',
-            'scopes'     => ['notifications:read'],
-            'status'     => 'active',
-            'label'      => 'test reader',
+            'scopes' => ['notifications:read'],
+            'status' => 'active',
+            'label' => 'test reader',
         ]);
 
         $this->revokedKey = ApiKey::query()->create([
             'identifier' => 'ep_live_revoked_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'revoked',
+            'scopes' => ['notifications:write'],
+            'status' => 'revoked',
             'revoked_at' => now(),
-            'label'      => 'test revoked',
+            'label' => 'test revoked',
         ]);
     }
 
@@ -69,13 +72,13 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'email',
+                'channel' => 'email',
                 'recipient' => 'user@example.com',
-                'payload'   => [
-                    'subject'   => 'Your order has shipped',
+                'payload' => [
+                    'subject' => 'Your order has shipped',
                     'body_text' => 'Tracking: ORD-9981',
                 ],
-                'priority'  => 'normal',
+                'priority' => 'normal',
             ],
             $this->writerHeaders(idempotencyKey: 'idem-email-aaaa-0001'),
         );
@@ -104,15 +107,15 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'webhook',
+                'channel' => 'webhook',
                 'recipient' => 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-                'payload'   => [
+                'payload' => [
                     'body' => [
-                        'event'    => 'order.shipped',
+                        'event' => 'order.shipped',
                         'order_id' => 'ORD-9981',
                     ],
                 ],
-                'priority'  => 'high',
+                'priority' => 'high',
             ],
             $this->writerHeaders(idempotencyKey: 'idem-webhook-bbbb-0001'),
         );
@@ -127,9 +130,9 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'sms',
+                'channel' => 'sms',
                 'recipient' => '+381641234567',
-                'payload'   => ['body' => 'Your code is 1234'],
+                'payload' => ['body' => 'Your code is 1234'],
             ],
             $this->writerHeaders(idempotencyKey: 'idem-sms-cccc-0001'),
         );
@@ -148,10 +151,10 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'email',
+                'channel' => 'email',
                 'recipient' => 'persisted@example.com',
-                'payload'   => [
-                    'subject'   => 'Persistence smoke test',
+                'payload' => [
+                    'subject' => 'Persistence smoke test',
                     'body_text' => 'hello',
                 ],
             ],
@@ -188,13 +191,13 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'sms',
+                'channel' => 'sms',
                 'recipient' => '+381641234567',
-                'payload'   => ['body' => 'hi'],
+                'payload' => ['body' => 'hi'],
             ],
             $this->writerHeaders(
                 idempotencyKey: 'idem-corr-aaaa-0001',
-                correlationId:  'req_caller-supplied-12345',
+                correlationId: 'req_caller-supplied-12345',
             ),
         );
 
@@ -209,9 +212,9 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'sms',
+                'channel' => 'sms',
                 'recipient' => '+381641234567',
-                'payload'   => ['body' => 'hi'],
+                'payload' => ['body' => 'hi'],
             ],
             $this->writerHeaders(idempotencyKey: 'idem-corr-bbbb-0001'),
         );
@@ -248,7 +251,7 @@ final class SubmitNotificationTest extends TestCase
             '/api/v1/notifications',
             $this->validEmailBody(),
             [
-                'Authorization'   => 'Basic dXNlcjpwYXNz',
+                'Authorization' => 'Basic dXNlcjpwYXNz',
                 'Idempotency-Key' => 'idem-401-bbbb-0001',
             ],
         );
@@ -264,7 +267,7 @@ final class SubmitNotificationTest extends TestCase
             '/api/v1/notifications',
             $this->validEmailBody(),
             [
-                'Authorization'   => 'Bearer ep_live_does_not_exist',
+                'Authorization' => 'Bearer ep_live_does_not_exist',
                 'Idempotency-Key' => 'idem-401-cccc-0001',
             ],
         );
@@ -279,7 +282,7 @@ final class SubmitNotificationTest extends TestCase
             '/api/v1/notifications',
             $this->validEmailBody(),
             [
-                'Authorization'   => "Bearer {$this->revokedKey->identifier}",
+                'Authorization' => "Bearer {$this->revokedKey->identifier}",
                 'Idempotency-Key' => 'idem-401-dddd-0001',
             ],
         );
@@ -298,7 +301,7 @@ final class SubmitNotificationTest extends TestCase
             '/api/v1/notifications',
             $this->validEmailBody(),
             [
-                'Authorization'   => "Bearer {$this->readOnlyKey->identifier}",
+                'Authorization' => "Bearer {$this->readOnlyKey->identifier}",
                 'Idempotency-Key' => 'idem-403-aaaa-0001',
             ],
         );
@@ -364,9 +367,9 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'email',
+                'channel' => 'email',
                 'recipient' => 'definitely-not-an-email',
-                'payload'   => ['subject' => 'x', 'body_text' => 'y'],
+                'payload' => ['subject' => 'x', 'body_text' => 'y'],
             ],
             $this->writerHeaders(idempotencyKey: 'idem-422-cccc-0001'),
         );
@@ -381,9 +384,9 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'email',
+                'channel' => 'email',
                 'recipient' => 'user@example.com',
-                'payload'   => ['subject' => 'Subject only — no body'],
+                'payload' => ['subject' => 'Subject only — no body'],
             ],
             $this->writerHeaders(idempotencyKey: 'idem-422-dddd-0001'),
         );
@@ -398,9 +401,9 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'sms',
+                'channel' => 'sms',
                 'recipient' => '+381641234567',
-                'payload'   => [],
+                'payload' => [],
             ],
             $this->writerHeaders(idempotencyKey: 'idem-422-eeee-0001'),
         );
@@ -415,9 +418,9 @@ final class SubmitNotificationTest extends TestCase
         $response = $this->postJson(
             '/api/v1/notifications',
             [
-                'channel'   => 'sms',
+                'channel' => 'sms',
                 'recipient' => '+381641234567',
-                'payload'   => ['body' => str_repeat('x', 1601)],
+                'payload' => ['body' => str_repeat('x', 1601)],
             ],
             $this->writerHeaders(idempotencyKey: 'idem-422-ffff-0001'),
         );
@@ -449,10 +452,10 @@ final class SubmitNotificationTest extends TestCase
     private function validEmailBody(): array
     {
         return [
-            'channel'   => 'email',
+            'channel' => 'email',
             'recipient' => 'user@example.com',
-            'payload'   => [
-                'subject'   => 'subject',
+            'payload' => [
+                'subject' => 'subject',
                 'body_text' => 'body',
             ],
         ];
@@ -464,7 +467,7 @@ final class SubmitNotificationTest extends TestCase
     private function writerHeaders(string $idempotencyKey, ?string $correlationId = null): array
     {
         $headers = [
-            'Authorization'   => "Bearer {$this->writerKey->identifier}",
+            'Authorization' => "Bearer {$this->writerKey->identifier}",
             'Idempotency-Key' => $idempotencyKey,
         ];
 
@@ -479,10 +482,10 @@ final class SubmitNotificationTest extends TestCase
      * Assert that the validation-error response includes a `fields[]` entry
      * whose `path` matches the expected JSON Pointer.
      */
-    private function assertHasFieldError(\Illuminate\Testing\TestResponse $response, string $expectedPath): void
+    private function assertHasFieldError(TestResponse $response, string $expectedPath): void
     {
         $fields = $response->json('error.details.fields') ?? [];
-        $paths  = array_column($fields, 'path');
+        $paths = array_column($fields, 'path');
 
         self::assertContains(
             $expectedPath,

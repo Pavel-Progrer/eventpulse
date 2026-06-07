@@ -41,7 +41,7 @@ use EventPulse\Domain\Notification\Enum\Priority;
 final readonly class SubmitNotificationCommand
 {
     /**
-     * @param array<string, mixed> $payload Domain-shaped payload (mapped at the boundary).
+     * @param  array<string, mixed>  $payload  Domain-shaped payload (mapped at the boundary).
      */
     public function __construct(
         public Channel $channel,

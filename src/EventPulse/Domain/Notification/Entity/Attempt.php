@@ -26,8 +26,11 @@ use EventPulse\Domain\Notification\ValueObject\AttemptNumber;
 final class Attempt
 {
     private ?DateTimeImmutable $completedAt = null;
+
     private ?bool $succeeded = null;
+
     private ?FailureClassification $failureClassification = null;
+
     private ?string $failureReason = null;
 
     /**
@@ -49,7 +52,7 @@ final class Attempt
     {
         $this->assertNotAlreadyCompleted();
         $this->completedAt = $completedAt;
-        $this->succeeded   = true;
+        $this->succeeded = true;
     }
 
     /**
@@ -61,10 +64,10 @@ final class Attempt
         DateTimeImmutable $completedAt,
     ): void {
         $this->assertNotAlreadyCompleted();
-        $this->completedAt           = $completedAt;
-        $this->succeeded             = false;
+        $this->completedAt = $completedAt;
+        $this->succeeded = false;
         $this->failureClassification = $classification;
-        $this->failureReason         = $reason;
+        $this->failureReason = $reason;
     }
 
     // ---------------------------------------------------------------------------

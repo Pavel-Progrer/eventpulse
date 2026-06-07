@@ -15,11 +15,12 @@ use PHPUnit\Framework\TestCase;
 final class AttemptTest extends TestCase
 {
     private DateTimeImmutable $startedAt;
+
     private DateTimeImmutable $completedAt;
 
     protected function setUp(): void
     {
-        $this->startedAt   = new DateTimeImmutable('2026-04-21 10:00:00');
+        $this->startedAt = new DateTimeImmutable('2026-04-21 10:00:00');
         $this->completedAt = new DateTimeImmutable('2026-04-21 10:00:05');
     }
 
@@ -36,7 +37,7 @@ final class AttemptTest extends TestCase
 
     public function test_new_attempt_has_correct_number_and_start_time(): void
     {
-        $number  = AttemptNumber::fromInt(3);
+        $number = AttemptNumber::fromInt(3);
         $attempt = new Attempt($number, $this->startedAt);
 
         self::assertTrue($attempt->number()->equals($number));

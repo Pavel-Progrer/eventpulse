@@ -35,11 +35,11 @@ final class AuthenticateApiKey
     {
         $header = $request->header('Authorization', '');
 
-        if (!is_string($header) || $header === '') {
+        if (! is_string($header) || $header === '') {
             return $this->unauthorized('Missing Authorization header.');
         }
 
-        if (!str_starts_with($header, 'Bearer ')) {
+        if (! str_starts_with($header, 'Bearer ')) {
             return $this->unauthorized('Authorization header must use Bearer scheme.');
         }
 
@@ -56,7 +56,7 @@ final class AuthenticateApiKey
             return $this->unauthorized('Unknown API key.');
         }
 
-        if (!$apiKey->isActive()) {
+        if (! $apiKey->isActive()) {
             return $this->unauthorized('API key is not active.');
         }
 
@@ -72,7 +72,7 @@ final class AuthenticateApiKey
         return new JsonResponse(
             [
                 'error' => [
-                    'code'    => 'UNAUTHORIZED',
+                    'code' => 'UNAUTHORIZED',
                     'message' => $message,
                 ],
             ],

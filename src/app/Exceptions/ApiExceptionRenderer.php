@@ -62,69 +62,69 @@ final class ApiExceptionRenderer
 
         if ($e instanceof ValidationException) {
             return $this->envelope(
-                code:          'VALIDATION_ERROR',
-                message:       'Request body or headers failed validation.',
-                status:        Response::HTTP_UNPROCESSABLE_ENTITY,
+                code: 'VALIDATION_ERROR',
+                message: 'Request body or headers failed validation.',
+                status: Response::HTTP_UNPROCESSABLE_ENTITY,
                 correlationId: $correlationId,
-                details:       ['fields' => $this->formatValidationErrors($e)],
+                details: ['fields' => $this->formatValidationErrors($e)],
             );
         }
 
         if ($e instanceof RecipientChannelMismatchException) {
             return $this->envelope(
-                code:          'VALIDATION_ERROR',
-                message:       'The recipient is not compatible with the requested channel.',
-                status:        Response::HTTP_UNPROCESSABLE_ENTITY,
+                code: 'VALIDATION_ERROR',
+                message: 'The recipient is not compatible with the requested channel.',
+                status: Response::HTTP_UNPROCESSABLE_ENTITY,
                 correlationId: $correlationId,
-                details:       ['reason' => $e->getMessage()],
+                details: ['reason' => $e->getMessage()],
             );
         }
 
         if ($e instanceof InvalidNotificationInputException) {
             return $this->envelope(
-                code:          'VALIDATION_ERROR',
-                message:       'The request data violates a notification domain rule.',
-                status:        Response::HTTP_UNPROCESSABLE_ENTITY,
+                code: 'VALIDATION_ERROR',
+                message: 'The request data violates a notification domain rule.',
+                status: Response::HTTP_UNPROCESSABLE_ENTITY,
                 correlationId: $correlationId,
-                details:       ['reason' => $e->getMessage()],
+                details: ['reason' => $e->getMessage()],
             );
         }
 
         if ($e instanceof IdempotencyConflictException) {
             return $this->envelope(
-                code:          'IDEMPOTENCY_CONFLICT',
-                message:       'The Idempotency-Key has already been used with a different request body.',
-                status:        Response::HTTP_CONFLICT,
+                code: 'IDEMPOTENCY_CONFLICT',
+                message: 'The Idempotency-Key has already been used with a different request body.',
+                status: Response::HTTP_CONFLICT,
                 correlationId: $correlationId,
-                details:       ['idempotency_key' => $e->idempotencyKey()->toString()],
+                details: ['idempotency_key' => $e->idempotencyKey()->toString()],
             );
         }
 
         if ($e instanceof AlreadyReplayedException) {
             return $this->envelope(
-                code:          'ALREADY_REPLAYED',
-                message:       'This DLQ entry has already been replayed.',
-                status:        Response::HTTP_CONFLICT,
+                code: 'ALREADY_REPLAYED',
+                message: 'This DLQ entry has already been replayed.',
+                status: Response::HTTP_CONFLICT,
                 correlationId: $correlationId,
             );
         }
 
         if ($e instanceof WebhookDestinationAlreadyDisabledException) {
             return $this->envelope(
-                code:          'ALREADY_DISABLED',
-                message:       'This webhook destination is already disabled.',
-                status:        Response::HTTP_CONFLICT,
+                code: 'ALREADY_DISABLED',
+                message: 'This webhook destination is already disabled.',
+                status: Response::HTTP_CONFLICT,
                 correlationId: $correlationId,
             );
         }
 
         if ($e instanceof InvalidNotificationTransitionException) {
             return $this->envelope(
-                code:          'INVALID_STATE',
-                message:       'The notification cannot perform the requested operation in its current state.',
-                status:        Response::HTTP_CONFLICT,
+                code: 'INVALID_STATE',
+                message: 'The notification cannot perform the requested operation in its current state.',
+                status: Response::HTTP_CONFLICT,
                 correlationId: $correlationId,
-                details:       ['reason' => $e->getMessage()],
+                details: ['reason' => $e->getMessage()],
             );
         }
 
@@ -138,9 +138,9 @@ final class ApiExceptionRenderer
             || $e instanceof NotFoundHttpException
         ) {
             return $this->envelope(
-                code:          'NOT_FOUND',
-                message:       'The requested resource was not found.',
-                status:        Response::HTTP_NOT_FOUND,
+                code: 'NOT_FOUND',
+                message: 'The requested resource was not found.',
+                status: Response::HTTP_NOT_FOUND,
                 correlationId: $correlationId,
             );
         }
@@ -149,7 +149,7 @@ final class ApiExceptionRenderer
     }
 
     /**
-     * @param array<string, mixed>|null $details
+     * @param  array<string, mixed>|null  $details
      */
     private function envelope(
         string $code,
@@ -161,7 +161,7 @@ final class ApiExceptionRenderer
         $payload = [
             'error' => array_filter(
                 [
-                    'code'    => $code,
+                    'code' => $code,
                     'message' => $message,
                     'details' => $details,
                 ],
@@ -184,11 +184,11 @@ final class ApiExceptionRenderer
         $fields = [];
 
         foreach ($e->errors() as $key => $messages) {
-            $path = '/' . str_replace('.', '/', (string) $key);
+            $path = '/'.str_replace('.', '/', (string) $key);
 
             foreach ((array) $messages as $message) {
                 $fields[] = [
-                    'path'    => $path,
+                    'path' => $path,
                     'message' => $message,
                 ];
             }

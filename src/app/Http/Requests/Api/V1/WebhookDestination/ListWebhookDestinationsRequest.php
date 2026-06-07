@@ -25,7 +25,7 @@ final class ListWebhookDestinationsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'limit'  => ['nullable', 'integer', 'min:1', 'max:100'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'cursor' => ['nullable', 'string', 'max:128'],
         ];
     }

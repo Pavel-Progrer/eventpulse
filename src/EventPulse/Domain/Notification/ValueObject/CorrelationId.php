@@ -7,7 +7,6 @@ namespace EventPulse\Domain\Notification\ValueObject;
 use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 use EventPulse\Domain\Shared\UuidGenerator;
 
-
 /**
  * A string that ties together all log lines, events, and derivative actions
  * caused by a single caller request (domain.md §2).
@@ -41,7 +40,7 @@ final class CorrelationId
             );
         }
 
-        if (!preg_match('/^[\x21-\x7E]+$/', $value)) {
+        if (! preg_match('/^[\x21-\x7E]+$/', $value)) {
             throw new InvalidNotificationInputException(
                 'CorrelationId must contain only printable ASCII characters.'
             );

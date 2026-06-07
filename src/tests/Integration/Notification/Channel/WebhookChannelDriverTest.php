@@ -45,6 +45,7 @@ use Tests\TestCase;
 final class WebhookChannelDriverTest extends TestCase
 {
     private const string DESTINATION_ID = '11111111-2222-4333-8444-555555555555';
+
     private const string SIGNING_SECRET = 'test-signing-secret-at-least-16c';
 
     private InMemoryWebhookEndpointResolver $resolver;
@@ -53,11 +54,11 @@ final class WebhookChannelDriverTest extends TestCase
     {
         parent::setUp();
 
-        $this->resolver = new InMemoryWebhookEndpointResolver();
+        $this->resolver = new InMemoryWebhookEndpointResolver;
         $this->resolver->register(
             self::DESTINATION_ID,
             new WebhookEndpoint(
-                url:           'https://hooks.example.com/notify',
+                url: 'https://hooks.example.com/notify',
                 signingSecret: self::SIGNING_SECRET,
             ),
         );
@@ -85,7 +86,7 @@ final class WebhookChannelDriverTest extends TestCase
         ]);
 
         $request = $this->webhookRequest([
-            'body'    => ['event' => 'user.signed_up', 'user_id' => 42],
+            'body' => ['event' => 'user.signed_up', 'user_id' => 42],
             'headers' => ['X-Custom-Header' => 'custom-value'],
         ]);
 
@@ -157,9 +158,9 @@ final class WebhookChannelDriverTest extends TestCase
 
             // Re-compute the signature using the same algorithm as the driver
             // (ADR-0005 §Decision): HMAC-SHA256 over "{timestamp}.{body_json}".
-            $bodyJson      = json_encode($body, JSON_THROW_ON_ERROR);
-            $signedPayload = $timestamp . '.' . $bodyJson;
-            $expected      = 'sha256=' . hash_hmac('sha256', $signedPayload, self::SIGNING_SECRET);
+            $bodyJson = json_encode($body, JSON_THROW_ON_ERROR);
+            $signedPayload = $timestamp.'.'.$bodyJson;
+            $expected = 'sha256='.hash_hmac('sha256', $signedPayload, self::SIGNING_SECRET);
 
             return hash_equals($expected, $signature);
         });
@@ -169,7 +170,7 @@ final class WebhookChannelDriverTest extends TestCase
     public function dispatch_omits_signature_headers_when_endpoint_has_no_secret(): void
     {
         // Register an unsigned endpoint (no secret) — the legacy / test path.
-        $this->resolver = new InMemoryWebhookEndpointResolver();
+        $this->resolver = new InMemoryWebhookEndpointResolver;
         $this->resolver->register(
             self::DESTINATION_ID,
             new WebhookEndpoint(url: 'https://hooks.example.com/notify'),
@@ -196,7 +197,7 @@ final class WebhookChannelDriverTest extends TestCase
         ]);
 
         $request = $this->webhookRequest([
-            'event'   => 'user.signed_up',
+            'event' => 'user.signed_up',
             'user_id' => 42,
         ]);
 
@@ -216,13 +217,13 @@ final class WebhookChannelDriverTest extends TestCase
         ]);
 
         $request = $this->webhookRequest([
-            'body'    => ['x' => 1],
+            'body' => ['x' => 1],
             'headers' => [
-                'X-EventPulse-Signature'      => 'forged-sig',
-                'X-EventPulse-Timestamp'      => '0',
+                'X-EventPulse-Signature' => 'forged-sig',
+                'X-EventPulse-Timestamp' => '0',
                 'X-EventPulse-Notification-ID' => 'forged-id',
-                'Content-Type'                => 'text/plain',
-                'X-Allowed'                   => 'allowed-value',
+                'Content-Type' => 'text/plain',
+                'X-Allowed' => 'allowed-value',
             ],
         ]);
 
@@ -230,7 +231,7 @@ final class WebhookChannelDriverTest extends TestCase
 
         Http::assertSent(function (Request $req): bool {
             $sig = $req->header('X-EventPulse-Signature')[0] ?? '';
-            $ts  = $req->header('X-EventPulse-Timestamp')[0] ?? '';
+            $ts = $req->header('X-EventPulse-Timestamp')[0] ?? '';
 
             // The caller-supplied forged-sig and timestamp of '0' must be
             // overwritten by the driver's own HMAC computation.
@@ -249,16 +250,16 @@ final class WebhookChannelDriverTest extends TestCase
      */
     public static function httpStatusProvider(): iterable
     {
-        yield '200 OK'                  => [200, true,  null];
-        yield '201 Created'             => [201, true,  null];
-        yield '204 No Content'          => [204, true,  null];
-        yield '408 Request Timeout'     => [408, false, FailureClassification::Transient];
-        yield '429 Too Many Requests'   => [429, false, FailureClassification::Transient];
-        yield '410 Gone'                => [410, false, FailureClassification::Permanent];
-        yield '400 Bad Request'         => [400, false, FailureClassification::Permanent];
-        yield '401 Unauthorized'        => [401, false, FailureClassification::Permanent];
-        yield '404 Not Found'           => [404, false, FailureClassification::Permanent];
-        yield '500 Server Error'        => [500, false, FailureClassification::Transient];
+        yield '200 OK' => [200, true,  null];
+        yield '201 Created' => [201, true,  null];
+        yield '204 No Content' => [204, true,  null];
+        yield '408 Request Timeout' => [408, false, FailureClassification::Transient];
+        yield '429 Too Many Requests' => [429, false, FailureClassification::Transient];
+        yield '410 Gone' => [410, false, FailureClassification::Permanent];
+        yield '400 Bad Request' => [400, false, FailureClassification::Permanent];
+        yield '401 Unauthorized' => [401, false, FailureClassification::Permanent];
+        yield '404 Not Found' => [404, false, FailureClassification::Permanent];
+        yield '500 Server Error' => [500, false, FailureClassification::Transient];
         yield '503 Service Unavailable' => [503, false, FailureClassification::Transient];
     }
 
@@ -307,7 +308,7 @@ final class WebhookChannelDriverTest extends TestCase
     #[Test]
     public function dispatch_returns_unrecoverable_when_destination_does_not_exist(): void
     {
-        $this->resolver = new InMemoryWebhookEndpointResolver();
+        $this->resolver = new InMemoryWebhookEndpointResolver;
 
         $outcome = $this->driver()->dispatch($this->webhookRequest());
 
@@ -319,7 +320,7 @@ final class WebhookChannelDriverTest extends TestCase
     #[Test]
     public function dispatch_returns_permanent_when_destination_is_disabled(): void
     {
-        $this->resolver = new InMemoryWebhookEndpointResolver();
+        $this->resolver = new InMemoryWebhookEndpointResolver;
         $this->resolver->markDisabled(self::DESTINATION_ID);
 
         $outcome = $this->driver()->dispatch($this->webhookRequest());
@@ -334,11 +335,11 @@ final class WebhookChannelDriverTest extends TestCase
     {
         $request = new DispatchRequest(
             notificationId: NotificationId::generate(),
-            channel:        Channel::Webhook,
-            recipient:      EmailRecipient::fromString('user@example.com'),
-            payload:        NotificationPayload::forChannel(['x' => 'y'], Channel::Webhook),
-            correlationId:  CorrelationId::generate(),
-            attemptNumber:  AttemptNumber::first(),
+            channel: Channel::Webhook,
+            recipient: EmailRecipient::fromString('user@example.com'),
+            payload: NotificationPayload::forChannel(['x' => 'y'], Channel::Webhook),
+            correlationId: CorrelationId::generate(),
+            attemptNumber: AttemptNumber::first(),
         );
 
         $this->expectException(LogicException::class);
@@ -353,15 +354,15 @@ final class WebhookChannelDriverTest extends TestCase
     private function driver(): WebhookChannelDriver
     {
         return new WebhookChannelDriver(
-            http:             $this->app->make(HttpFactory::class),
+            http: $this->app->make(HttpFactory::class),
             endpointResolver: $this->resolver,
-            logger:           new NullLogger(),
-            timeoutSeconds:   30,
+            logger: new NullLogger,
+            timeoutSeconds: 30,
         );
     }
 
     /**
-     * @param array<string, mixed>|null $payload
+     * @param  array<string, mixed>|null  $payload
      */
     private function webhookRequest(?array $payload = null): DispatchRequest
     {
@@ -369,11 +370,11 @@ final class WebhookChannelDriverTest extends TestCase
 
         return new DispatchRequest(
             notificationId: NotificationId::generate(),
-            channel:        Channel::Webhook,
-            recipient:      WebhookRecipient::fromDestinationId(self::DESTINATION_ID),
-            payload:        NotificationPayload::forChannel($payload, Channel::Webhook),
-            correlationId:  CorrelationId::generate(),
-            attemptNumber:  AttemptNumber::first(),
+            channel: Channel::Webhook,
+            recipient: WebhookRecipient::fromDestinationId(self::DESTINATION_ID),
+            payload: NotificationPayload::forChannel($payload, Channel::Webhook),
+            correlationId: CorrelationId::generate(),
+            attemptNumber: AttemptNumber::first(),
         );
     }
 }

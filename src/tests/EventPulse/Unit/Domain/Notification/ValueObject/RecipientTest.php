@@ -59,12 +59,12 @@ final class RecipientTest extends TestCase
     public static function invalidEmailProvider(): array
     {
         return [
-            'empty string'       => [''],
-            'missing @'          => ['notanemail'],
-            'missing domain'     => ['user@'],
+            'empty string' => [''],
+            'missing @' => ['notanemail'],
+            'missing domain' => ['user@'],
             'missing local part' => ['@example.com'],
-            'double @'           => ['user@@example.com'],
-            'spaces in address'  => ['user @example.com'],
+            'double @' => ['user@@example.com'],
+            'spaces in address' => ['user @example.com'],
         ];
     }
 
@@ -84,7 +84,7 @@ final class RecipientTest extends TestCase
 
     public function test_email_recipient_is_not_equal_to_other_recipient_type(): void
     {
-        $email   = EmailRecipient::fromString('user@example.com');
+        $email = EmailRecipient::fromString('user@example.com');
         $webhook = WebhookRecipient::fromDestinationId('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d');
         self::assertFalse($email->equals($webhook));
     }
@@ -96,7 +96,7 @@ final class RecipientTest extends TestCase
     public function test_webhook_recipient_accepts_valid_uuid(): void
     {
         $uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
-        $r    = WebhookRecipient::fromDestinationId($uuid);
+        $r = WebhookRecipient::fromDestinationId($uuid);
         self::assertSame($uuid, $r->destinationId());
         self::assertSame($uuid, $r->toString());
     }
@@ -114,11 +114,11 @@ final class RecipientTest extends TestCase
     public static function invalidUuidProvider(): array
     {
         return [
-            'empty string'        => [''],
-            'plain string'        => ['not-a-uuid'],
+            'empty string' => [''],
+            'plain string' => ['not-a-uuid'],
             'uuid without dashes' => ['a1b2c3d4e5f64a7b8c9d0e1f2a3b4c5d'],
-            'too short'           => ['a1b2c3d4-e5f6-4a7b'],
-            'wrong variant byte'  => ['a1b2c3d4-e5f6-4a7b-0c9d-0e1f2a3b4c5d'],
+            'too short' => ['a1b2c3d4-e5f6-4a7b'],
+            'wrong variant byte' => ['a1b2c3d4-e5f6-4a7b-0c9d-0e1f2a3b4c5d'],
         ];
     }
 
@@ -157,9 +157,9 @@ final class RecipientTest extends TestCase
     {
         return [
             'Serbia mobile' => ['+381641234567'],
-            'US number'     => ['+12125551234'],
-            'UK number'     => ['+447911123456'],
-            'short number'  => ['+1212'],
+            'US number' => ['+12125551234'],
+            'UK number' => ['+447911123456'],
+            'short number' => ['+1212'],
         ];
     }
 
@@ -176,12 +176,12 @@ final class RecipientTest extends TestCase
     public static function invalidE164Provider(): array
     {
         return [
-            'no plus prefix'          => ['381641234567'],
+            'no plus prefix' => ['381641234567'],
             'leading zero after plus' => ['+0381641234567'],
-            'too long (16 digits)'    => ['+1234567890123456'],
-            'contains letters'        => ['+1234abc5678'],
-            'empty string'            => [''],
-            'just a plus'             => ['+'],
+            'too long (16 digits)' => ['+1234567890123456'],
+            'contains letters' => ['+1234abc5678'],
+            'empty string' => [''],
+            'just a plus' => ['+'],
         ];
     }
 

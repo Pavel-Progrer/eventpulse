@@ -94,13 +94,13 @@ final class EloquentWebhookEndpointResolver implements WebhookEndpointResolver
             // retrying (retrying cannot fix a decryption failure).
             $this->logger->error('webhook.destination.secret_unreadable', [
                 'destination_id' => $destinationId,
-                'reason'         => $e->getMessage(),
+                'reason' => $e->getMessage(),
             ]);
             throw WebhookEndpointResolutionException::notFound($recipient);
         }
 
         return new WebhookEndpoint(
-            url:           $model->url,
+            url: $model->url,
             signingSecret: $secret,
         );
     }

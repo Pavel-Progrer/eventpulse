@@ -33,22 +33,22 @@ return [
     */
     'retry' => [
         'webhook' => [
-            'max_attempts'       => (int)   env('EVENTPULSE_RETRY_WEBHOOK_MAX_ATTEMPTS', 6),
-            'base_delay_seconds' => (int)   env('EVENTPULSE_RETRY_WEBHOOK_BASE_DELAY', 10),
-            'max_delay_seconds'  => (int)   env('EVENTPULSE_RETRY_WEBHOOK_MAX_DELAY', 3600),
-            'jitter_fraction'    => (float) env('EVENTPULSE_RETRY_WEBHOOK_JITTER', 0.25),
+            'max_attempts' => (int) env('EVENTPULSE_RETRY_WEBHOOK_MAX_ATTEMPTS', 6),
+            'base_delay_seconds' => (int) env('EVENTPULSE_RETRY_WEBHOOK_BASE_DELAY', 10),
+            'max_delay_seconds' => (int) env('EVENTPULSE_RETRY_WEBHOOK_MAX_DELAY', 3600),
+            'jitter_fraction' => (float) env('EVENTPULSE_RETRY_WEBHOOK_JITTER', 0.25),
         ],
         'email' => [
-            'max_attempts'       => (int)   env('EVENTPULSE_RETRY_EMAIL_MAX_ATTEMPTS', 4),
-            'base_delay_seconds' => (int)   env('EVENTPULSE_RETRY_EMAIL_BASE_DELAY', 30),
-            'max_delay_seconds'  => (int)   env('EVENTPULSE_RETRY_EMAIL_MAX_DELAY', 1800),
-            'jitter_fraction'    => (float) env('EVENTPULSE_RETRY_EMAIL_JITTER', 0.25),
+            'max_attempts' => (int) env('EVENTPULSE_RETRY_EMAIL_MAX_ATTEMPTS', 4),
+            'base_delay_seconds' => (int) env('EVENTPULSE_RETRY_EMAIL_BASE_DELAY', 30),
+            'max_delay_seconds' => (int) env('EVENTPULSE_RETRY_EMAIL_MAX_DELAY', 1800),
+            'jitter_fraction' => (float) env('EVENTPULSE_RETRY_EMAIL_JITTER', 0.25),
         ],
         'sms' => [
-            'max_attempts'       => (int)   env('EVENTPULSE_RETRY_SMS_MAX_ATTEMPTS', 3),
-            'base_delay_seconds' => (int)   env('EVENTPULSE_RETRY_SMS_BASE_DELAY', 15),
-            'max_delay_seconds'  => (int)   env('EVENTPULSE_RETRY_SMS_MAX_DELAY', 600),
-            'jitter_fraction'    => (float) env('EVENTPULSE_RETRY_SMS_JITTER', 0.25),
+            'max_attempts' => (int) env('EVENTPULSE_RETRY_SMS_MAX_ATTEMPTS', 3),
+            'base_delay_seconds' => (int) env('EVENTPULSE_RETRY_SMS_BASE_DELAY', 15),
+            'max_delay_seconds' => (int) env('EVENTPULSE_RETRY_SMS_MAX_DELAY', 600),
+            'jitter_fraction' => (float) env('EVENTPULSE_RETRY_SMS_JITTER', 0.25),
         ],
     ],
 ];

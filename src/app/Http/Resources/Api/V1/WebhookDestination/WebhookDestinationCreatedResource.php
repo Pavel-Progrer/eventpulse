@@ -36,11 +36,11 @@ final class WebhookDestinationCreatedResource extends JsonResource
         $result = $this->resource;
 
         return [
-            'id'         => $result->id->toString(),
-            'url'        => $result->url,
-            'name'       => $result->name,
-            'status'     => $result->status->value,
-            'secret'     => $result->secret,
+            'id' => $result->id->toString(),
+            'url' => $result->url,
+            'name' => $result->name,
+            'status' => $result->status->value,
+            'secret' => $result->secret,
             'created_at' => $result->createdAt->format(\DateTimeInterface::ATOM),
         ];
     }

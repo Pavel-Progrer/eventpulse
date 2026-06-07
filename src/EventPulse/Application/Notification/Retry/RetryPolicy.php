@@ -65,10 +65,10 @@ interface RetryPolicy
      * sees only absolute timestamps; relative delays are an
      * implementation detail of the policy, not the aggregate.
      *
-     * @param AttemptNumber $failedAttemptNumber The number of the attempt
-     *   that just failed. After attempt 1 fails the policy returns the
-     *   delay before attempt 2 begins; the formula in the production
-     *   implementation is `min(base * 2^(failedAttempt-1), max) * jitter`.
+     * @param  AttemptNumber  $failedAttemptNumber  The number of the attempt
+     *                                              that just failed. After attempt 1 fails the policy returns the
+     *                                              delay before attempt 2 begins; the formula in the production
+     *                                              implementation is `min(base * 2^(failedAttempt-1), max) * jitter`.
      */
     public function nextDelay(
         Channel $channel,

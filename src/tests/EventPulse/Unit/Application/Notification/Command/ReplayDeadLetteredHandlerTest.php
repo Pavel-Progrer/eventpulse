@@ -9,7 +9,6 @@ use EventPulse\Application\Notification\Command\ReplayDeadLetteredCommand;
 use EventPulse\Application\Notification\Command\ReplayDeadLetteredHandler;
 use EventPulse\Application\Notification\DeadLetter\Exception\DeadLetteredNotificationNotFoundException;
 use EventPulse\Application\Shared\NullDomainEventDispatcher;
-use EventPulse\Domain\Notification\Enum\FailureClassification;
 use EventPulse\Domain\Notification\Enum\NotificationStatus;
 use EventPulse\Tests\Unit\Application\Support\FixedClock;
 use EventPulse\Tests\Unit\Application\Support\InMemoryNotificationDispatchQueue;
@@ -33,31 +32,33 @@ final class ReplayDeadLetteredHandlerTest extends TestCase
     private const string MISSING_ID = 'a0000000-0000-4000-8000-000000000001';
 
     private InMemoryNotificationRepository $repository;
+
     private InMemoryNotificationDispatchQueue $queue;
+
     private ReplayDeadLetteredHandler $handler;
 
     protected function setUp(): void
     {
-        $this->repository = new InMemoryNotificationRepository();
-        $this->queue      = new InMemoryNotificationDispatchQueue();
-        $this->handler    = new ReplayDeadLetteredHandler(
-            repository:    $this->repository,
+        $this->repository = new InMemoryNotificationRepository;
+        $this->queue = new InMemoryNotificationDispatchQueue;
+        $this->handler = new ReplayDeadLetteredHandler(
+            repository: $this->repository,
             dispatchQueue: $this->queue,
-            events:        new NullDomainEventDispatcher(),
-            clock:         new FixedClock(NotificationMother::now()),
+            events: new NullDomainEventDispatcher,
+            clock: new FixedClock(NotificationMother::now()),
         );
     }
 
     private function command(
         string $notificationId,
         string $apiKeyId = 'api-key-uuid-0001',
-        string $idemKey  = 'replay-idem-key-001',
+        string $idemKey = 'replay-idem-key-001',
     ): ReplayDeadLetteredCommand {
         return new ReplayDeadLetteredCommand(
             notificationId: $notificationId,
-            apiKeyId:       $apiKeyId,
+            apiKeyId: $apiKeyId,
             idempotencyKey: $idemKey,
-            correlationId:  null,
+            correlationId: null,
         );
     }
 
@@ -105,7 +106,7 @@ final class ReplayDeadLetteredHandlerTest extends TestCase
 
         ($this->handler)($this->command(
             notificationId: $original->id()->toString(),
-            apiKeyId:       'different-api-key',
+            apiKeyId: 'different-api-key',
         ));
     }
 
@@ -155,7 +156,7 @@ final class ReplayDeadLetteredHandlerTest extends TestCase
         $original = NotificationMother::deadLetteredNotification();
         $this->repository->save($original);
 
-        $replay   = ($this->handler)($this->command($original->id()->toString()));
+        $replay = ($this->handler)($this->command($original->id()->toString()));
         $enqueued = $this->queue->enqueued();
 
         self::assertCount(1, $enqueued);
@@ -168,7 +169,7 @@ final class ReplayDeadLetteredHandlerTest extends TestCase
         $original = NotificationMother::deadLetteredNotification();
         $this->repository->save($original);
 
-        $replay        = ($this->handler)($this->command($original->id()->toString()));
+        $replay = ($this->handler)($this->command($original->id()->toString()));
         $savedOriginal = $this->repository->findById($original->id());
 
         self::assertNotNull($savedOriginal);
@@ -187,7 +188,7 @@ final class ReplayDeadLetteredHandlerTest extends TestCase
         $original = NotificationMother::deadLetteredNotification();
         $this->repository->save($original);
 
-        $first  = ($this->handler)($this->command($original->id()->toString(), idemKey: 'fixed-key'));
+        $first = ($this->handler)($this->command($original->id()->toString(), idemKey: 'fixed-key'));
         $second = ($this->handler)($this->command($original->id()->toString(), idemKey: 'fixed-key'));
 
         // Both calls return the same replay notification — no second aggregate created.

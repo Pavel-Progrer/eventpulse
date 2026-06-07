@@ -22,8 +22,8 @@ use EventPulse\Domain\Notification\Enum\NotificationStatus;
 final readonly class ListNotificationsQuery
 {
     /**
-     * @param list<NotificationStatus> $statuses
-     * @param list<Channel>            $channels
+     * @param  list<NotificationStatus>  $statuses
+     * @param  list<Channel>  $channels
      */
     public function __construct(
         public string $apiKeyId,
