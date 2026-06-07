@@ -48,10 +48,10 @@ final readonly class SubmitNotificationResult
     public static function accepted(Notification $notification): self
     {
         return new self(
-            id:                  $notification->id(),
-            status:              $notification->status(),
-            correlationId:       $notification->correlationId(),
-            createdAt:           $notification->createdAt(),
+            id: $notification->id(),
+            status: $notification->status(),
+            correlationId: $notification->correlationId(),
+            createdAt: $notification->createdAt(),
             wasIdempotentReplay: false,
         );
     }
@@ -67,10 +67,10 @@ final readonly class SubmitNotificationResult
     public static function idempotentReplay(Notification $notification): self
     {
         return new self(
-            id:                  $notification->id(),
-            status:              $notification->status(),
-            correlationId:       $notification->correlationId(),
-            createdAt:           $notification->createdAt(),
+            id: $notification->id(),
+            status: $notification->status(),
+            correlationId: $notification->correlationId(),
+            createdAt: $notification->createdAt(),
             wasIdempotentReplay: true,
         );
     }

@@ -36,8 +36,8 @@ final class ListWebhookDestinationsController
 
         $query = new ListWebhookDestinationsQuery(
             apiKeyId: (string) $apiKey->id,
-            limit:    (int) $request->validated('limit', 20),
-            afterId:  $request->validated('cursor'),
+            limit: (int) $request->validated('limit', 20),
+            afterId: $request->validated('cursor'),
         );
 
         $result = ($this->handler)($query);

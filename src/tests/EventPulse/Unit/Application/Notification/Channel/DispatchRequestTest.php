@@ -24,7 +24,7 @@ final class DispatchRequestTest extends TestCase
     public function from_aggregate_carries_identity_and_routing_data(): void
     {
         $notification = NotificationMother::emailNotification();
-        $attempt      = $notification->beginAttempt(NotificationMother::now());
+        $attempt = $notification->beginAttempt(NotificationMother::now());
 
         $request = DispatchRequest::from($notification, $attempt);
 
@@ -52,15 +52,15 @@ final class DispatchRequestTest extends TestCase
         $first = $notification->beginAttempt(NotificationMother::now());
         $notification->recordFailure(
             classification: FailureClassification::Transient,
-            reason:         'simulated transient failure',
-            maxAttempts:    5,
-            now:            NotificationMother::later(10),
-            retryAfter:     NotificationMother::later(30),
+            reason: 'simulated transient failure',
+            maxAttempts: 5,
+            now: NotificationMother::later(10),
+            retryAfter: NotificationMother::later(30),
         );
 
         $second = $notification->beginAttempt(NotificationMother::later(40));
 
-        $firstRequest  = DispatchRequest::from($notification, $first);
+        $firstRequest = DispatchRequest::from($notification, $first);
         $secondRequest = DispatchRequest::from($notification, $second);
 
         self::assertSame(1, $firstRequest->attemptNumber->toInt());

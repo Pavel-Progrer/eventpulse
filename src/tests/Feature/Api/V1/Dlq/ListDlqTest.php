@@ -30,7 +30,9 @@ final class ListDlqTest extends TestCase
     use UsesNotificationFactory;
 
     private ApiKey $reader;        // dlq:read
+
     private ApiKey $otherTenant;   // dlq:read but different api key
+
     private ApiKey $writeOnly;     // notifications:write only — must 403
 
     protected function setUp(): void
@@ -39,23 +41,23 @@ final class ListDlqTest extends TestCase
 
         $this->reader = ApiKey::query()->create([
             'identifier' => 'ep_live_dlq_reader_001',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader A',
+            'scopes' => ['dlq:read'],
+            'status' => 'active',
+            'label' => 'reader A',
         ]);
 
         $this->otherTenant = ApiKey::query()->create([
             'identifier' => 'ep_live_dlq_reader_002',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'reader B',
+            'scopes' => ['dlq:read'],
+            'status' => 'active',
+            'label' => 'reader B',
         ]);
 
         $this->writeOnly = ApiKey::query()->create([
             'identifier' => 'ep_live_writer_only_001',
-            'scopes'     => ['notifications:write'],
-            'status'     => 'active',
-            'label'      => 'writer with no DLQ access',
+            'scopes' => ['notifications:write'],
+            'status' => 'active',
+            'label' => 'writer with no DLQ access',
         ]);
     }
 
@@ -149,7 +151,7 @@ final class ListDlqTest extends TestCase
 
         // Shape per OpenAPI DlqEntry — every documented key present.
         foreach (['id', 'notification_id', 'reason', 'channel', 'created_at',
-                  'final_attempt_at', 'replayed_at', 'replay_notification_id'] as $key) {
+            'final_attempt_at', 'replayed_at', 'replay_notification_id'] as $key) {
             self::assertArrayHasKey($key, $rows[0], "missing key: $key");
         }
     }
@@ -266,25 +268,25 @@ final class ListDlqTest extends TestCase
         $first = $this->getJson('/api/v1/dlq?limit=2', $this->headersFor($this->reader))
             ->assertOk();
         $firstIds = array_column($first->json('data'), 'notification_id');
-        $cursor1  = $first->json('pagination.next_cursor');
+        $cursor1 = $first->json('pagination.next_cursor');
 
         self::assertCount(2, $firstIds);
         self::assertNotNull($cursor1);
 
         // Page 2.
         $second = $this->getJson(
-            '/api/v1/dlq?limit=2&cursor=' . urlencode($cursor1),
+            '/api/v1/dlq?limit=2&cursor='.urlencode($cursor1),
             $this->headersFor($this->reader),
         )->assertOk();
         $secondIds = array_column($second->json('data'), 'notification_id');
-        $cursor2   = $second->json('pagination.next_cursor');
+        $cursor2 = $second->json('pagination.next_cursor');
 
         self::assertCount(2, $secondIds);
         self::assertNotNull($cursor2);
 
         // Page 3 — final, no further cursor.
         $third = $this->getJson(
-            '/api/v1/dlq?limit=2&cursor=' . urlencode($cursor2),
+            '/api/v1/dlq?limit=2&cursor='.urlencode($cursor2),
             $this->headersFor($this->reader),
         )->assertOk();
         $thirdIds = array_column($third->json('data'), 'notification_id');
@@ -311,7 +313,7 @@ final class ListDlqTest extends TestCase
     {
         return [
             'Authorization' => "Bearer {$key->identifier}",
-            'Accept'        => 'application/json',
+            'Accept' => 'application/json',
         ];
     }
 }

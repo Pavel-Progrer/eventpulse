@@ -46,7 +46,7 @@ final class ChannelDispatcher
     private readonly array $driversByChannel;
 
     /**
-     * @param iterable<ChannelDriver> $drivers
+     * @param  iterable<ChannelDriver>  $drivers
      *
      * The constructor accepts an iterable so the service provider can pass
      * a tagged-resolved set without forcing a specific collection type.
@@ -65,7 +65,7 @@ final class ChannelDispatcher
             if (isset($byChannel[$key])) {
                 throw new \LogicException(sprintf(
                     'Two ChannelDrivers registered for channel "%s": %s and %s. '
-                    . 'Each channel must have exactly one driver.',
+                    .'Each channel must have exactly one driver.',
                     $key,
                     $byChannel[$key]::class,
                     $driver::class,
@@ -80,10 +80,10 @@ final class ChannelDispatcher
         // not a 500 at the moment a customer first uses that channel —
         // the latter is the kind of bug nobody sees until production.
         foreach (Channel::cases() as $channel) {
-            if (!isset($byChannel[$channel->value])) {
+            if (! isset($byChannel[$channel->value])) {
                 throw new \LogicException(sprintf(
                     'No ChannelDriver registered for channel "%s". '
-                    . 'Register an implementation in EventPulseServiceProvider.',
+                    .'Register an implementation in EventPulseServiceProvider.',
                     $channel->value,
                 ));
             }
@@ -102,7 +102,7 @@ final class ChannelDispatcher
      */
     public function dispatch(Notification $notification, Attempt $attempt): DispatchOutcome
     {
-        $driver  = $this->driverFor($notification->channel());
+        $driver = $this->driverFor($notification->channel());
         $request = DispatchRequest::from($notification, $attempt);
 
         return $driver->dispatch($request);

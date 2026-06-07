@@ -33,9 +33,9 @@ final class LaravelNotificationDispatchQueueTest extends TestCase
     {
         Bus::fake();
 
-        $adapter = new LaravelNotificationDispatchQueue();
-        $id      = NotificationId::generate();
-        $cid     = CorrelationId::generate();
+        $adapter = new LaravelNotificationDispatchQueue;
+        $id = NotificationId::generate();
+        $cid = CorrelationId::generate();
 
         $adapter->enqueue($id, $cid, Priority::High);
 
@@ -55,14 +55,14 @@ final class LaravelNotificationDispatchQueueTest extends TestCase
     {
         Bus::fake();
 
-        $adapter     = new LaravelNotificationDispatchQueue();
+        $adapter = new LaravelNotificationDispatchQueue;
         $availableAt = new DateTimeImmutable('2026-04-25T10:01:30Z', new DateTimeZone('UTC'));
 
         $adapter->enqueue(
             notificationId: NotificationId::generate(),
-            correlationId:  CorrelationId::generate(),
-            priority:       Priority::Normal,
-            availableAt:    $availableAt,
+            correlationId: CorrelationId::generate(),
+            priority: Priority::Normal,
+            availableAt: $availableAt,
         );
 
         Bus::assertDispatched(
@@ -88,7 +88,7 @@ final class LaravelNotificationDispatchQueueTest extends TestCase
     {
         Bus::fake();
 
-        $adapter = new LaravelNotificationDispatchQueue();
+        $adapter = new LaravelNotificationDispatchQueue;
 
         // One enqueue per priority. The per-queue assertions below
         // verify that each priority routed to exactly its expected
@@ -98,8 +98,8 @@ final class LaravelNotificationDispatchQueueTest extends TestCase
         foreach ([Priority::High, Priority::Normal, Priority::Low] as $priority) {
             $adapter->enqueue(
                 notificationId: NotificationId::generate(),
-                correlationId:  CorrelationId::generate(),
-                priority:       $priority,
+                correlationId: CorrelationId::generate(),
+                priority: $priority,
             );
         }
 

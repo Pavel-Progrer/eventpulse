@@ -39,7 +39,8 @@ use Illuminate\Support\Facades\Schema;
  * a notification" without a sort, and a `created_at` index would
  * support time-windowed queries when the metrics layer arrives.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('attempts', function (Blueprint $table): void {
@@ -81,13 +82,13 @@ return new class extends Migration {
         // classification and no reason; a failed attempt has both;
         // an in-progress attempt (succeeded IS NULL) has neither.
         Schema::getConnection()->statement(
-            "ALTER TABLE attempts
+            'ALTER TABLE attempts
                 ADD CONSTRAINT attempts_outcome_consistency_check
                 CHECK (
                     (succeeded IS NULL  AND classification IS NULL AND reason IS NULL AND completed_at IS NULL)
                     OR (succeeded = TRUE  AND classification IS NULL AND reason IS NULL AND completed_at IS NOT NULL)
                     OR (succeeded = FALSE AND classification IS NOT NULL AND reason IS NOT NULL AND completed_at IS NOT NULL)
-                )"
+                )'
         );
     }
 

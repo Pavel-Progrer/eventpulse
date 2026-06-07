@@ -27,12 +27,12 @@ final class RecordingLogger extends AbstractLogger
     public array $records = [];
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     public function log($level, string|Stringable $message, array $context = []): void
     {
         $this->records[] = [
-            'level'   => (string) $level,
+            'level' => (string) $level,
             'message' => (string) $message,
             'context' => $context,
         ];

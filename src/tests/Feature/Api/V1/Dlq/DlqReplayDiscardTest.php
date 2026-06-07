@@ -41,7 +41,9 @@ final class DlqReplayDiscardTest extends TestCase
     use UsesNotificationFactory;
 
     private ApiKey $replayOps;   // dlq:read + dlq:replay
+
     private ApiKey $readOnly;    // dlq:read only — no replay / discard access
+
     private ApiKey $otherTenant; // dlq:replay but a different tenant
 
     protected function setUp(): void
@@ -50,23 +52,23 @@ final class DlqReplayDiscardTest extends TestCase
 
         $this->replayOps = ApiKey::query()->create([
             'identifier' => 'ep_live_replay_ops_001',
-            'scopes'     => ['dlq:read', 'dlq:replay'],
-            'status'     => 'active',
-            'label'      => 'replay ops',
+            'scopes' => ['dlq:read', 'dlq:replay'],
+            'status' => 'active',
+            'label' => 'replay ops',
         ]);
 
         $this->readOnly = ApiKey::query()->create([
             'identifier' => 'ep_live_dlq_ro_001',
-            'scopes'     => ['dlq:read'],
-            'status'     => 'active',
-            'label'      => 'read-only',
+            'scopes' => ['dlq:read'],
+            'status' => 'active',
+            'label' => 'read-only',
         ]);
 
         $this->otherTenant = ApiKey::query()->create([
             'identifier' => 'ep_live_replay_ops_002',
-            'scopes'     => ['dlq:read', 'dlq:replay'],
-            'status'     => 'active',
-            'label'      => 'other tenant',
+            'scopes' => ['dlq:read', 'dlq:replay'],
+            'status' => 'active',
+            'label' => 'other tenant',
         ]);
 
         // Prevent real queue dispatch during feature tests.
@@ -80,7 +82,7 @@ final class DlqReplayDiscardTest extends TestCase
     #[Test]
     public function replay_returns_401_without_bearer_token(): void
     {
-        $this->postJson('/api/v1/dlq/' . Uuid::uuid4()->toString() . '/replay')
+        $this->postJson('/api/v1/dlq/'.Uuid::uuid4()->toString().'/replay')
             ->assertStatus(401);
     }
 
@@ -88,7 +90,7 @@ final class DlqReplayDiscardTest extends TestCase
     public function replay_returns_403_when_caller_lacks_dlq_replay_scope(): void
     {
         $this->postJson(
-            '/api/v1/dlq/' . Uuid::uuid4()->toString() . '/replay',
+            '/api/v1/dlq/'.Uuid::uuid4()->toString().'/replay',
             [],
             $this->headersFor($this->readOnly),
         )->assertStatus(403);
@@ -98,11 +100,11 @@ final class DlqReplayDiscardTest extends TestCase
     public function replay_returns_404_for_unknown_id(): void
     {
         $this->postJson(
-            '/api/v1/dlq/' . Uuid::uuid4()->toString() . '/replay',
+            '/api/v1/dlq/'.Uuid::uuid4()->toString().'/replay',
             [],
             $this->headersWithIdempotencyKey($this->replayOps),
         )->assertStatus(404)
-         ->assertJsonPath('error.code', 'NOT_FOUND');
+            ->assertJsonPath('error.code', 'NOT_FOUND');
     }
 
     #[Test]
@@ -111,7 +113,7 @@ final class DlqReplayDiscardTest extends TestCase
         $notification = $this->factory()->dlqEntry($this->otherTenant)->save();
 
         $this->postJson(
-            '/api/v1/dlq/' . $notification->id()->toString() . '/replay',
+            '/api/v1/dlq/'.$notification->id()->toString().'/replay',
             [],
             $this->headersWithIdempotencyKey($this->replayOps),
         )->assertStatus(404);
@@ -123,7 +125,7 @@ final class DlqReplayDiscardTest extends TestCase
         $original = $this->factory()->dlqEntry($this->replayOps)->save();
 
         $response = $this->postJson(
-            '/api/v1/dlq/' . $original->id()->toString() . '/replay',
+            '/api/v1/dlq/'.$original->id()->toString().'/replay',
             [],
             $this->headersWithIdempotencyKey($this->replayOps),
         )->assertStatus(202);
@@ -148,7 +150,7 @@ final class DlqReplayDiscardTest extends TestCase
         $original = $this->factory()->dlqEntry($this->replayOps)->save();
 
         $response = $this->postJson(
-            '/api/v1/dlq/' . $original->id()->toString() . '/replay',
+            '/api/v1/dlq/'.$original->id()->toString().'/replay',
             [],
             array_merge(
                 $this->headersWithIdempotencyKey($this->replayOps),
@@ -166,14 +168,14 @@ final class DlqReplayDiscardTest extends TestCase
     public function replay_is_idempotent_with_the_same_idempotency_key(): void
     {
         $original = $this->factory()->dlqEntry($this->replayOps)->save();
-        $headers  = $this->headersWithIdempotencyKey($this->replayOps, 'replay-idem-key-fixed');
+        $headers = $this->headersWithIdempotencyKey($this->replayOps, 'replay-idem-key-fixed');
 
-        $first  = $this->postJson(
-            '/api/v1/dlq/' . $original->id()->toString() . '/replay', [], $headers,
+        $first = $this->postJson(
+            '/api/v1/dlq/'.$original->id()->toString().'/replay', [], $headers,
         )->assertStatus(202);
 
         $second = $this->postJson(
-            '/api/v1/dlq/' . $original->id()->toString() . '/replay', [], $headers,
+            '/api/v1/dlq/'.$original->id()->toString().'/replay', [], $headers,
         )->assertStatus(202);
 
         // Both responses carry the same new notification id — idempotent replay.
@@ -183,27 +185,27 @@ final class DlqReplayDiscardTest extends TestCase
     #[Test]
     public function replay_returns_409_when_already_replayed_with_different_key(): void
     {
-        $original     = $this->factory()->dlqEntry($this->replayOps)->save();
+        $original = $this->factory()->dlqEntry($this->replayOps)->save();
         $firstHeaders = $this->headersWithIdempotencyKey($this->replayOps, 'first-replay-key');
         $otherHeaders = $this->headersWithIdempotencyKey($this->replayOps, 'second-replay-key');
 
         // First replay succeeds.
         $this->postJson(
-            '/api/v1/dlq/' . $original->id()->toString() . '/replay', [], $firstHeaders,
+            '/api/v1/dlq/'.$original->id()->toString().'/replay', [], $firstHeaders,
         )->assertStatus(202);
 
         // A different idempotency key on the same already-replayed entry → 409.
         $this->postJson(
-            '/api/v1/dlq/' . $original->id()->toString() . '/replay', [], $otherHeaders,
+            '/api/v1/dlq/'.$original->id()->toString().'/replay', [], $otherHeaders,
         )->assertStatus(409)
-         ->assertJsonPath('error.code', 'ALREADY_REPLAYED');
+            ->assertJsonPath('error.code', 'ALREADY_REPLAYED');
     }
 
     #[Test]
     public function replayed_notification_appears_in_original_dlq_entry_get_response(): void
     {
         $original = $this->factory()->dlqEntry($this->replayOps)->save();
-        $id       = $original->id()->toString();
+        $id = $original->id()->toString();
 
         $replayResponse = $this->postJson(
             "/api/v1/dlq/{$id}/replay",
@@ -229,7 +231,7 @@ final class DlqReplayDiscardTest extends TestCase
     #[Test]
     public function discard_returns_401_without_bearer_token(): void
     {
-        $this->deleteJson('/api/v1/dlq/' . Uuid::uuid4()->toString())
+        $this->deleteJson('/api/v1/dlq/'.Uuid::uuid4()->toString())
             ->assertStatus(401);
     }
 
@@ -237,7 +239,7 @@ final class DlqReplayDiscardTest extends TestCase
     public function discard_returns_403_when_caller_lacks_dlq_replay_scope(): void
     {
         $this->deleteJson(
-            '/api/v1/dlq/' . Uuid::uuid4()->toString(),
+            '/api/v1/dlq/'.Uuid::uuid4()->toString(),
             [],
             $this->headersFor($this->readOnly),
         )->assertStatus(403);
@@ -247,11 +249,11 @@ final class DlqReplayDiscardTest extends TestCase
     public function discard_returns_404_for_unknown_id(): void
     {
         $this->deleteJson(
-            '/api/v1/dlq/' . Uuid::uuid4()->toString(),
+            '/api/v1/dlq/'.Uuid::uuid4()->toString(),
             [],
             $this->headersFor($this->replayOps),
         )->assertStatus(404)
-         ->assertJsonPath('error.code', 'NOT_FOUND');
+            ->assertJsonPath('error.code', 'NOT_FOUND');
     }
 
     #[Test]
@@ -260,7 +262,7 @@ final class DlqReplayDiscardTest extends TestCase
         $notification = $this->factory()->dlqEntry($this->otherTenant)->save();
 
         $this->deleteJson(
-            '/api/v1/dlq/' . $notification->id()->toString(),
+            '/api/v1/dlq/'.$notification->id()->toString(),
             [],
             $this->headersFor($this->replayOps),
         )->assertStatus(404);
@@ -272,7 +274,7 @@ final class DlqReplayDiscardTest extends TestCase
         $notification = $this->factory()->dlqEntry($this->replayOps)->save();
 
         $this->deleteJson(
-            '/api/v1/dlq/' . $notification->id()->toString(),
+            '/api/v1/dlq/'.$notification->id()->toString(),
             [],
             $this->headersFor($this->replayOps),
         )->assertStatus(204);
@@ -282,35 +284,35 @@ final class DlqReplayDiscardTest extends TestCase
     public function discarded_entry_no_longer_appears_in_dlq_list(): void
     {
         $notification = $this->factory()->dlqEntry($this->replayOps)->save();
-        $id           = $notification->id()->toString();
+        $id = $notification->id()->toString();
 
         // Visible before discard.
         $this->getJson('/api/v1/dlq', $this->headersFor($this->replayOps))
-             ->assertStatus(200)
-             ->assertJsonCount(1, 'data');
+            ->assertStatus(200)
+            ->assertJsonCount(1, 'data');
 
         // Discard it.
         $this->deleteJson("/api/v1/dlq/{$id}", [], $this->headersFor($this->replayOps))
-             ->assertStatus(204);
+            ->assertStatus(204);
 
         // Gone from the default DLQ list view.
         $this->getJson('/api/v1/dlq', $this->headersFor($this->replayOps))
-             ->assertStatus(200)
-             ->assertJsonCount(0, 'data');
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
     }
 
     #[Test]
     public function discard_is_idempotent(): void
     {
         $notification = $this->factory()->dlqEntry($this->replayOps)->save();
-        $id           = $notification->id()->toString();
+        $id = $notification->id()->toString();
 
         $this->deleteJson("/api/v1/dlq/{$id}", [], $this->headersFor($this->replayOps))
-             ->assertStatus(204);
+            ->assertStatus(204);
 
         // Second discard of the same entry → still 204.
         $this->deleteJson("/api/v1/dlq/{$id}", [], $this->headersFor($this->replayOps))
-             ->assertStatus(204);
+            ->assertStatus(204);
     }
 
     // =========================================================================
@@ -322,7 +324,7 @@ final class DlqReplayDiscardTest extends TestCase
      */
     private function headersFor(ApiKey $key): array
     {
-        return ['Authorization' => 'Bearer ' . $key->identifier];
+        return ['Authorization' => 'Bearer '.$key->identifier];
     }
 
     /**

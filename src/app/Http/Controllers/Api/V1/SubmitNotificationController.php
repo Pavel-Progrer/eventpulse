@@ -41,16 +41,16 @@ final class SubmitNotificationController
         $apiKey = $request->attributes->get('api_key');
 
         $command = new SubmitNotificationCommand(
-            channel:        Channel::from($request->validated('channel')),
-            recipient:      (string) $request->validated('recipient'),
-            payload:        $this->mapPayloadForDomain(
+            channel: Channel::from($request->validated('channel')),
+            recipient: (string) $request->validated('recipient'),
+            payload: $this->mapPayloadForDomain(
                 $request->validated('channel'),
                 $request->validated('payload', []),
             ),
-            priority:       Priority::from($request->validated('priority', 'normal')),
+            priority: Priority::from($request->validated('priority', 'normal')),
             idempotencyKey: (string) $request->header('Idempotency-Key'),
-            apiKeyId:       $apiKey->id,
-            correlationId:  $request->header('X-Correlation-ID'),
+            apiKeyId: $apiKey->id,
+            correlationId: $request->header('X-Correlation-ID'),
         );
 
         $result = ($this->handler)($command);
@@ -80,7 +80,7 @@ final class SubmitNotificationController
      * domain stays free of HTTP-specific naming and the API is free to evolve
      * its names without rewriting domain rules.
      *
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function mapPayloadForDomain(string $channel, array $payload): array

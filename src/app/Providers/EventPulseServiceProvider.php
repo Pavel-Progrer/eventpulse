@@ -78,10 +78,10 @@ final class EventPulseServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     public array $bindings = [
-        Clock::class                               => SystemClock::class,
-        DomainEventDispatcher::class               => StructuredLogDomainEventDispatcher::class,
-        NotificationRepository::class              => EloquentNotificationRepository::class,
-        NotificationDispatchQueue::class           => LaravelNotificationDispatchQueue::class,
+        Clock::class => SystemClock::class,
+        DomainEventDispatcher::class => StructuredLogDomainEventDispatcher::class,
+        NotificationRepository::class => EloquentNotificationRepository::class,
+        NotificationDispatchQueue::class => LaravelNotificationDispatchQueue::class,
         DeadLetteredNotificationsRepository::class => EloquentDeadLetteredNotificationsRepository::class,
     ];
 
@@ -96,10 +96,10 @@ final class EventPulseServiceProvider extends ServiceProvider
 
     public function boot(Router $router): void
     {
-        $router->aliasMiddleware('auth.api-key',  AuthenticateApiKey::class);
-        $router->aliasMiddleware('scope',         RequireScope::class);
-        $router->aliasMiddleware('throttle.api',  ThrottleApiRequests::class);
-        $router->aliasMiddleware('throttle.ip',   ThrottleIpRequests::class);
+        $router->aliasMiddleware('auth.api-key', AuthenticateApiKey::class);
+        $router->aliasMiddleware('scope', RequireScope::class);
+        $router->aliasMiddleware('throttle.api', ThrottleApiRequests::class);
+        $router->aliasMiddleware('throttle.ip', ThrottleIpRequests::class);
     }
 
     // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ final class EventPulseServiceProvider extends ServiceProvider
             function (Application $app): WebhookEndpointResolver {
                 return new EloquentWebhookEndpointResolver(
                     encrypter: $app->make(Encrypter::class),
-                    logger:    $app->make(LoggerInterface::class),
+                    logger: $app->make(LoggerInterface::class),
                 );
             },
         );
@@ -167,38 +167,38 @@ final class EventPulseServiceProvider extends ServiceProvider
     private function registerChannelDispatcher(): void
     {
         $this->app->singleton(EmailChannelDriver::class, function (Application $app): EmailChannelDriver {
-            $config      = $app['config']->get('mail.from', []);
+            $config = $app['config']->get('mail.from', []);
             $fromAddress = is_string($config['address'] ?? null) ? trim($config['address']) : '';
-            $fromName    = is_string($config['name']    ?? null) ? trim($config['name'])    : '';
+            $fromName = is_string($config['name'] ?? null) ? trim($config['name']) : '';
 
             if ($fromAddress === '') {
                 throw new \RuntimeException(
                     'EventPulse email driver requires mail.from.address to be configured '
-                    . '(set MAIL_FROM_ADDRESS in your environment).',
+                    .'(set MAIL_FROM_ADDRESS in your environment).',
                 );
             }
 
             if ($fromName === '') {
                 throw new \RuntimeException(
                     'EventPulse email driver requires mail.from.name to be configured '
-                    . '(set MAIL_FROM_NAME in your environment).',
+                    .'(set MAIL_FROM_NAME in your environment).',
                 );
             }
 
             return new EmailChannelDriver(
-                mailer:      $app->make(Mailer::class),
-                logger:      $app->make(LoggerInterface::class),
+                mailer: $app->make(Mailer::class),
+                logger: $app->make(LoggerInterface::class),
                 fromAddress: $fromAddress,
-                fromName:    $fromName,
+                fromName: $fromName,
             );
         });
 
         $this->app->singleton(WebhookChannelDriver::class, function (Application $app): WebhookChannelDriver {
             return new WebhookChannelDriver(
-                http:             $app->make(HttpFactory::class),
+                http: $app->make(HttpFactory::class),
                 endpointResolver: $app->make(WebhookEndpointResolver::class),
-                logger:           $app->make(LoggerInterface::class),
-                timeoutSeconds:   (int) $app['config']->get('eventpulse.webhook.timeout_seconds', 30),
+                logger: $app->make(LoggerInterface::class),
+                timeoutSeconds: (int) $app['config']->get('eventpulse.webhook.timeout_seconds', 30),
             );
         });
 
@@ -226,7 +226,7 @@ final class EventPulseServiceProvider extends ServiceProvider
     {
         $this->app->singleton(RetryPolicy::class, function (Application $app): RetryPolicy {
             /** @var array<string, array{max_attempts:int, base_delay_seconds:int, max_delay_seconds:int, jitter_fraction:float}> $raw */
-            $raw      = (array) $app['config']->get('eventpulse.retry', []);
+            $raw = (array) $app['config']->get('eventpulse.retry', []);
             $settings = [];
 
             foreach (Channel::cases() as $channel) {
@@ -235,23 +235,23 @@ final class EventPulseServiceProvider extends ServiceProvider
                 if (! is_array($row)) {
                     throw new \RuntimeException(sprintf(
                         'EventPulse retry policy is missing a configuration row for channel "%s". '
-                        . 'Expected config/eventpulse.php to define eventpulse.retry.%s.',
+                        .'Expected config/eventpulse.php to define eventpulse.retry.%s.',
                         $channel->value,
                         $channel->value,
                     ));
                 }
 
                 $settings[$channel->value] = new RetrySettings(
-                    maxAttempts:      (int)   $row['max_attempts'],
-                    baseDelaySeconds: (int)   $row['base_delay_seconds'],
-                    maxDelaySeconds:  (int)   $row['max_delay_seconds'],
-                    jitterFraction:   (float) $row['jitter_fraction'],
+                    maxAttempts: (int) $row['max_attempts'],
+                    baseDelaySeconds: (int) $row['base_delay_seconds'],
+                    maxDelaySeconds: (int) $row['max_delay_seconds'],
+                    jitterFraction: (float) $row['jitter_fraction'],
                 );
             }
 
             return new ChannelRetryPolicy(
-                settings:   $settings,
-                randomizer: new Randomizer(new Secure()),
+                settings: $settings,
+                randomizer: new Randomizer(new Secure),
             );
         });
     }

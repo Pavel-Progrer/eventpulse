@@ -36,10 +36,10 @@ final class RegisterWebhookDestinationController
         $apiKey = $request->attributes->get('api_key');
 
         $command = new RegisterWebhookDestinationCommand(
-            apiKeyId:      (string) $apiKey->id,
-            url:           (string) $request->validated('url'),
-            secret:        (string) $request->validated('secret'),
-            name:          $request->validated('name'),
+            apiKeyId: (string) $apiKey->id,
+            url: (string) $request->validated('url'),
+            secret: (string) $request->validated('secret'),
+            name: $request->validated('name'),
             correlationId: $request->header('X-Correlation-ID'),
         );
 

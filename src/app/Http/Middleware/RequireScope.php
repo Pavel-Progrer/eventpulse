@@ -35,11 +35,11 @@ final class RequireScope
         // Defensive: if the auth middleware did not run, fail closed.
         // This is a programming error (route forgot `auth.api-key`) but
         // returning 500 here would leak less information than 403.
-        if (!$apiKey instanceof ApiKey) {
+        if (! $apiKey instanceof ApiKey) {
             return new JsonResponse(
                 [
                     'error' => [
-                        'code'    => 'FORBIDDEN',
+                        'code' => 'FORBIDDEN',
                         'message' => 'Authentication required.',
                     ],
                 ],
@@ -47,11 +47,11 @@ final class RequireScope
             );
         }
 
-        if (!$apiKey->hasScope($requiredScope)) {
+        if (! $apiKey->hasScope($requiredScope)) {
             return new JsonResponse(
                 [
                     'error' => [
-                        'code'    => 'FORBIDDEN',
+                        'code' => 'FORBIDDEN',
                         'message' => sprintf('Missing required scope: %s', $requiredScope),
                         'details' => ['required_scope' => $requiredScope],
                     ],

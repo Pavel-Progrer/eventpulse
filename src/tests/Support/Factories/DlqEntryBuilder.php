@@ -49,10 +49,15 @@ use Illuminate\Support\Str;
 final class DlqEntryBuilder
 {
     private Channel $channel = Channel::Email;
+
     private Priority $priority = Priority::Normal;
+
     private string $reason = 'max_retries_exceeded';
+
     private DateTimeImmutable $deadLetteredAt;
+
     private ?Recipient $recipient = null;
+
     /** @var array<string, mixed>|null */
     private ?array $rawPayload = null;
 
@@ -87,7 +92,7 @@ final class DlqEntryBuilder
         // assertion in `Notification::request()` would otherwise
         // refuse the mismatch. Tests can still override after this
         // call by chaining `withRecipient()` / `withPayload()`.
-        $this->recipient  = null;
+        $this->recipient = null;
         $this->rawPayload = null;
 
         return $this;
@@ -105,7 +110,7 @@ final class DlqEntryBuilder
         if (! in_array($reason, ['max_retries_exceeded', 'unrecoverable_error'], strict: true)) {
             throw new \InvalidArgumentException(sprintf(
                 'Test factory cannot construct a notification with DLQ reason "%s"; '
-                . 'supported values are "max_retries_exceeded" and "unrecoverable_error".',
+                .'supported values are "max_retries_exceeded" and "unrecoverable_error".',
                 $reason,
             ));
         }
@@ -157,7 +162,7 @@ final class DlqEntryBuilder
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function withPayload(array $payload): self
     {
@@ -187,24 +192,24 @@ final class DlqEntryBuilder
         $requestedAt = $earliestAttempt->modify('-1 minute');
 
         $notification = Notification::request(
-            id:             NotificationId::generate(),
-            channel:        $this->channel,
-            recipient:      $this->recipient ?? $this->defaultRecipientFor($this->channel),
-            rawPayload:     $this->rawPayload ?? $this->defaultPayloadFor($this->channel),
-            priority:       $this->priority,
-            idempotencyKey: IdempotencyKey::fromString('idem-' . Str::uuid()->toString()),
-            apiKeyId:       $this->apiKeyId,
-            correlationId:  CorrelationId::generate(),
-            now:            $requestedAt,
+            id: NotificationId::generate(),
+            channel: $this->channel,
+            recipient: $this->recipient ?? $this->defaultRecipientFor($this->channel),
+            rawPayload: $this->rawPayload ?? $this->defaultPayloadFor($this->channel),
+            priority: $this->priority,
+            idempotencyKey: IdempotencyKey::fromString('idem-'.Str::uuid()->toString()),
+            apiKeyId: $this->apiKeyId,
+            correlationId: CorrelationId::generate(),
+            now: $requestedAt,
         );
 
-        $startedAt   = $this->deadLetteredAt->modify('-30 seconds');
+        $startedAt = $this->deadLetteredAt->modify('-30 seconds');
         $completedAt = $this->deadLetteredAt;
 
         match ($this->reason) {
             'max_retries_exceeded' => $this->exhaustRetryBudget($notification, $startedAt, $completedAt),
-            'unrecoverable_error'  => $this->failUnrecoverably($notification, $startedAt, $completedAt),
-            default                => throw new \LogicException(
+            'unrecoverable_error' => $this->failUnrecoverably($notification, $startedAt, $completedAt),
+            default => throw new \LogicException(
                 'Unreachable — withReason() guards the value.',
             ),
         };
@@ -241,15 +246,15 @@ final class DlqEntryBuilder
             // before the final attempt's window.
             $offset = -30 - ($this->precedingRetries - $i) * 60; // seconds before deadLetteredAt
             $rStart = $completedAt->modify(sprintf('%+d seconds', $offset));
-            $rEnd   = $rStart->modify('+5 seconds');
+            $rEnd = $rStart->modify('+5 seconds');
 
             $notification->beginAttempt($rStart);
             $notification->recordFailure(
                 classification: FailureClassification::Transient,
-                reason:         'connection refused',
-                maxAttempts:    $maxAttempts,
-                now:            $rEnd,
-                retryAfter:     $rEnd->modify('+1 minute'),
+                reason: 'connection refused',
+                maxAttempts: $maxAttempts,
+                now: $rEnd,
+                retryAfter: $rEnd->modify('+1 minute'),
             );
         }
 
@@ -258,10 +263,10 @@ final class DlqEntryBuilder
         $notification->beginAttempt($startedAt);
         $notification->recordFailure(
             classification: FailureClassification::Transient,
-            reason:         'connection refused',
-            maxAttempts:    $maxAttempts,
-            now:            $completedAt,
-            retryAfter:     $completedAt->modify('+1 minute'),
+            reason: 'connection refused',
+            maxAttempts: $maxAttempts,
+            now: $completedAt,
+            retryAfter: $completedAt->modify('+1 minute'),
         );
     }
 
@@ -273,20 +278,20 @@ final class DlqEntryBuilder
         $notification->beginAttempt($startedAt);
         $notification->recordFailure(
             classification: FailureClassification::Unrecoverable,
-            reason:         'destination configuration is invalid',
+            reason: 'destination configuration is invalid',
             // maxAttempts is irrelevant for unrecoverable — the
             // classification short-circuits to dead-letter.
-            maxAttempts:    99,
-            now:            $completedAt,
-            retryAfter:     $completedAt->modify('+1 minute'),
+            maxAttempts: 99,
+            now: $completedAt,
+            retryAfter: $completedAt->modify('+1 minute'),
         );
     }
 
     private function defaultRecipientFor(Channel $channel): Recipient
     {
         return match ($channel) {
-            Channel::Email   => EmailRecipient::fromString('recipient@example.test'),
-            Channel::Sms     => SmsRecipient::fromE164('+15555550100'),
+            Channel::Email => EmailRecipient::fromString('recipient@example.test'),
+            Channel::Sms => SmsRecipient::fromE164('+15555550100'),
             Channel::Webhook => WebhookRecipient::fromDestinationId(Str::uuid()->toString()),
         };
     }
@@ -297,8 +302,8 @@ final class DlqEntryBuilder
     private function defaultPayloadFor(Channel $channel): array
     {
         return match ($channel) {
-            Channel::Email   => ['subject' => 'Subject line', 'text' => 'Body text.'],
-            Channel::Sms     => ['body' => 'A short text.'],
+            Channel::Email => ['subject' => 'Subject line', 'text' => 'Body text.'],
+            Channel::Sms => ['body' => 'A short text.'],
             Channel::Webhook => ['event' => 'demo.event', 'data' => ['k' => 'v']],
         };
     }

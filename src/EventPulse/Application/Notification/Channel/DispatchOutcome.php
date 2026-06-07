@@ -58,9 +58,9 @@ final readonly class DispatchOutcome
     public static function success(?string $providerMessageId = null): self
     {
         return new self(
-            succeeded:         true,
-            classification:    null,
-            reason:            null,
+            succeeded: true,
+            classification: null,
+            reason: null,
             providerMessageId: $providerMessageId,
         );
     }
@@ -84,9 +84,9 @@ final readonly class DispatchOutcome
         }
 
         return new self(
-            succeeded:         false,
-            classification:    $classification,
-            reason:            $reason,
+            succeeded: false,
+            classification: $classification,
+            reason: $reason,
             providerMessageId: null,
         );
     }

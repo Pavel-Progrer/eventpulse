@@ -56,7 +56,7 @@ final class WebhookEndpoint
         // not just at destination-registration time — because a misconfigured
         // resolver (or a stale caching layer) could otherwise deliver a
         // downgraded URL into the dispatcher.
-        if (!str_starts_with($url, 'https://')) {
+        if (! str_starts_with($url, 'https://')) {
             throw new \InvalidArgumentException(sprintf(
                 'WebhookEndpoint URL must use https://; got "%s".',
                 $url,

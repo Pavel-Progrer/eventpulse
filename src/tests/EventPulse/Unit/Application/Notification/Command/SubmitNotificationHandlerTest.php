@@ -40,23 +40,29 @@ use PHPUnit\Framework\TestCase;
  */
 final class SubmitNotificationHandlerTest extends TestCase
 {
-    private const string API_KEY_ID       = 'api-key-uuid-0001';
+    private const string API_KEY_ID = 'api-key-uuid-0001';
+
     private const string OTHER_API_KEY_ID = 'api-key-uuid-0002';
-    private const string CLOCK_NOW        = '2026-04-23T10:15:30+00:00';
+
+    private const string CLOCK_NOW = '2026-04-23T10:15:30+00:00';
 
     private InMemoryNotificationRepository $repository;
+
     private InMemoryNotificationDispatchQueue $dispatchQueue;
+
     private NullDomainEventDispatcher $events;
+
     private FixedClock $clock;
+
     private SubmitNotificationHandler $handler;
 
     protected function setUp(): void
     {
-        $this->repository    = new InMemoryNotificationRepository();
-        $this->dispatchQueue = new InMemoryNotificationDispatchQueue();
-        $this->events        = new NullDomainEventDispatcher();
-        $this->clock         = FixedClock::at(self::CLOCK_NOW);
-        $this->handler       = new SubmitNotificationHandler(
+        $this->repository = new InMemoryNotificationRepository;
+        $this->dispatchQueue = new InMemoryNotificationDispatchQueue;
+        $this->events = new NullDomainEventDispatcher;
+        $this->clock = FixedClock::at(self::CLOCK_NOW);
+        $this->handler = new SubmitNotificationHandler(
             $this->repository,
             $this->dispatchQueue,
             $this->events,
@@ -135,7 +141,7 @@ final class SubmitNotificationHandlerTest extends TestCase
     #[Test]
     public function each_invocation_produces_a_unique_notification_id(): void
     {
-        $first  = ($this->handler)($this->emailCommand(idempotencyKey: 'idem-key-aaaaa-001'));
+        $first = ($this->handler)($this->emailCommand(idempotencyKey: 'idem-key-aaaaa-001'));
         $second = ($this->handler)($this->emailCommand(idempotencyKey: 'idem-key-bbbbb-002'));
 
         self::assertFalse($first->id->equals($second->id));
@@ -190,11 +196,11 @@ final class SubmitNotificationHandlerTest extends TestCase
     #[Test]
     public function it_uses_the_injected_clock_for_created_at(): void
     {
-        $clock         = FixedClock::at('2030-01-01T00:00:00+00:00');
-        $repository    = new InMemoryNotificationRepository();
-        $dispatchQueue = new InMemoryNotificationDispatchQueue();
-        $events        = new NullDomainEventDispatcher();
-        $handler       = new SubmitNotificationHandler($repository, $dispatchQueue, $events, $clock);
+        $clock = FixedClock::at('2030-01-01T00:00:00+00:00');
+        $repository = new InMemoryNotificationRepository;
+        $dispatchQueue = new InMemoryNotificationDispatchQueue;
+        $events = new NullDomainEventDispatcher;
+        $handler = new SubmitNotificationHandler($repository, $dispatchQueue, $events, $clock);
 
         $result = $handler($this->emailCommand());
 
@@ -234,7 +240,7 @@ final class SubmitNotificationHandlerTest extends TestCase
     #[Test]
     public function it_returns_the_same_notification_id_on_idempotent_replay(): void
     {
-        $first  = ($this->handler)($this->emailCommand(idempotencyKey: 'idem-replay-001'));
+        $first = ($this->handler)($this->emailCommand(idempotencyKey: 'idem-replay-001'));
         $second = ($this->handler)($this->emailCommand(idempotencyKey: 'idem-replay-001'));
 
         self::assertTrue($first->id->equals($second->id));
@@ -288,7 +294,7 @@ final class SubmitNotificationHandlerTest extends TestCase
     {
         $first = ($this->handler)($this->emailCommand(
             idempotencyKey: 'idem-replay-006',
-            correlationId:  'req_first_request_111',
+            correlationId: 'req_first_request_111',
         ));
 
         // Caller submits a *different* correlation id on the replay. The
@@ -296,7 +302,7 @@ final class SubmitNotificationHandlerTest extends TestCase
         // one — the tracing identity belongs to the original submission.
         $second = ($this->handler)($this->emailCommand(
             idempotencyKey: 'idem-replay-006',
-            correlationId:  'req_second_request_222',
+            correlationId: 'req_second_request_222',
         ));
 
         self::assertTrue($first->correlationId->equals($second->correlationId));
@@ -313,13 +319,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         ($this->handler)($this->emailCommand(idempotencyKey: 'idem-conflict-001'));
 
         $different = new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Different subject', 'text' => 'Different body'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Different subject', 'text' => 'Different body'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-conflict-001',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         $this->expectException(IdempotencyConflictException::class);
@@ -334,13 +340,13 @@ final class SubmitNotificationHandlerTest extends TestCase
 
         $different = $this->emailCommand(idempotencyKey: 'idem-conflict-002');
         $different = new SubmitNotificationCommand(
-            channel:        $different->channel,
-            recipient:      'someone-else@example.com',
-            payload:        $different->payload,
-            priority:       $different->priority,
+            channel: $different->channel,
+            recipient: 'someone-else@example.com',
+            payload: $different->payload,
+            priority: $different->priority,
             idempotencyKey: $different->idempotencyKey,
-            apiKeyId:       $different->apiKeyId,
-            correlationId:  $different->correlationId,
+            apiKeyId: $different->apiKeyId,
+            correlationId: $different->correlationId,
         );
 
         $this->expectException(IdempotencyConflictException::class);
@@ -354,13 +360,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         ($this->handler)($this->emailCommand(idempotencyKey: 'idem-conflict-003'));
 
         $sms = new SubmitNotificationCommand(
-            channel:        Channel::Sms,
-            recipient:      '+381641234567',
-            payload:        ['body' => 'A text'],
-            priority:       Priority::Normal,
+            channel: Channel::Sms,
+            recipient: '+381641234567',
+            payload: ['body' => 'A text'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-conflict-003',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         $this->expectException(IdempotencyConflictException::class);
@@ -374,13 +380,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         ($this->handler)($this->emailCommand(idempotencyKey: 'idem-conflict-004'));
 
         $highPriority = new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Hello', 'text' => 'World'],
-            priority:       Priority::High,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Hello', 'text' => 'World'],
+            priority: Priority::High,
             idempotencyKey: 'idem-conflict-004',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         $this->expectException(IdempotencyConflictException::class);
@@ -394,13 +400,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         ($this->handler)($this->emailCommand(idempotencyKey: 'idem-conflict-005'));
 
         $different = new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Different', 'text' => 'Body'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Different', 'text' => 'Body'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-conflict-005',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         try {
@@ -420,13 +426,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         ($this->handler)($this->emailCommand(idempotencyKey: 'idem-conflict-006'));
 
         $different = new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Different', 'text' => 'Body'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Different', 'text' => 'Body'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-conflict-006',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         try {
@@ -446,23 +452,23 @@ final class SubmitNotificationHandlerTest extends TestCase
     public function the_same_key_under_different_api_keys_does_not_collide(): void
     {
         $firstApiKey = ($this->handler)(new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Hello', 'text' => 'World'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Hello', 'text' => 'World'],
+            priority: Priority::Normal,
             idempotencyKey: 'shared-key-across-tenants',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         ));
 
         $secondApiKey = ($this->handler)(new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Hello', 'text' => 'World'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Hello', 'text' => 'World'],
+            priority: Priority::Normal,
             idempotencyKey: 'shared-key-across-tenants',
-            apiKeyId:       self::OTHER_API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::OTHER_API_KEY_ID,
+            correlationId: null,
         ));
 
         self::assertFalse(
@@ -483,13 +489,13 @@ final class SubmitNotificationHandlerTest extends TestCase
     public function it_propagates_an_invalid_email_recipient_as_invalid_argument(): void
     {
         $command = new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'not-an-email',
-            payload:        ['subject' => 'Hi', 'text' => 'Body'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'not-an-email',
+            payload: ['subject' => 'Hi', 'text' => 'Body'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-key-12345678',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         $this->expectException(InvalidArgumentException::class);
@@ -502,13 +508,13 @@ final class SubmitNotificationHandlerTest extends TestCase
     public function it_propagates_an_invalid_webhook_destination_id(): void
     {
         $command = new SubmitNotificationCommand(
-            channel:        Channel::Webhook,
-            recipient:      'not-a-uuid',
-            payload:        ['event' => 'foo'],
-            priority:       Priority::Normal,
+            channel: Channel::Webhook,
+            recipient: 'not-a-uuid',
+            payload: ['event' => 'foo'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-key-12345678',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         $this->expectException(InvalidArgumentException::class);
@@ -523,13 +529,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         // this, but the handler must not silently accept it if a non-HTTP
         // caller (Artisan, queue replay) bypasses that check.
         $command = new SubmitNotificationCommand(
-            channel:        Channel::Sms,
-            recipient:      '+381641234567',
-            payload:        [],
-            priority:       Priority::Normal,
+            channel: Channel::Sms,
+            recipient: '+381641234567',
+            payload: [],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-key-12345678',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         $this->expectException(InvalidArgumentException::class);
@@ -542,13 +548,13 @@ final class SubmitNotificationHandlerTest extends TestCase
     public function nothing_is_persisted_or_enqueued_when_the_domain_rejects_the_command(): void
     {
         $command = new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'not-an-email',
-            payload:        ['subject' => 'x', 'text' => 'y'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'not-an-email',
+            payload: ['subject' => 'x', 'text' => 'y'],
+            priority: Priority::Normal,
             idempotencyKey: 'idem-key-12345678',
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
 
         try {
@@ -589,13 +595,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         ?string $correlationId = null,
     ): SubmitNotificationCommand {
         return new SubmitNotificationCommand(
-            channel:        Channel::Email,
-            recipient:      'user@example.com',
-            payload:        ['subject' => 'Hello', 'text' => 'World'],
-            priority:       Priority::Normal,
+            channel: Channel::Email,
+            recipient: 'user@example.com',
+            payload: ['subject' => 'Hello', 'text' => 'World'],
+            priority: Priority::Normal,
             idempotencyKey: $idempotencyKey,
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  $correlationId,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: $correlationId,
         );
     }
 
@@ -603,13 +609,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         string $idempotencyKey = 'idem-key-12345678',
     ): SubmitNotificationCommand {
         return new SubmitNotificationCommand(
-            channel:        Channel::Webhook,
-            recipient:      'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-            payload:        ['event' => 'order.created', 'order_id' => 42],
-            priority:       Priority::High,
+            channel: Channel::Webhook,
+            recipient: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            payload: ['event' => 'order.created', 'order_id' => 42],
+            priority: Priority::High,
             idempotencyKey: $idempotencyKey,
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
     }
 
@@ -617,13 +623,13 @@ final class SubmitNotificationHandlerTest extends TestCase
         string $idempotencyKey = 'idem-key-12345678',
     ): SubmitNotificationCommand {
         return new SubmitNotificationCommand(
-            channel:        Channel::Sms,
-            recipient:      '+381641234567',
-            payload:        ['body' => 'Your code is 1234'],
-            priority:       Priority::Normal,
+            channel: Channel::Sms,
+            recipient: '+381641234567',
+            payload: ['body' => 'Your code is 1234'],
+            priority: Priority::Normal,
             idempotencyKey: $idempotencyKey,
-            apiKeyId:       self::API_KEY_ID,
-            correlationId:  null,
+            apiKeyId: self::API_KEY_ID,
+            correlationId: null,
         );
     }
 }

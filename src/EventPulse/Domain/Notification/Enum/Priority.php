@@ -14,7 +14,7 @@ namespace EventPulse\Domain\Notification\Enum;
  */
 enum Priority: string
 {
-    case Low    = 'low';
+    case Low = 'low';
     case Normal = 'normal';
-    case High   = 'high';
+    case High = 'high';
 }

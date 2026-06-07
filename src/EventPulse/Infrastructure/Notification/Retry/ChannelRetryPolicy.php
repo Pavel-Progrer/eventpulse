@@ -62,10 +62,10 @@ final class ChannelRetryPolicy implements RetryPolicy
     private const JITTER_GRANULARITY = 1_000_000;
 
     /**
-     * @param array<string, RetrySettings> $settings Keyed by `Channel->value`.
-     *   The constructor verifies every `Channel` case has a settings row
-     *   so that a missing channel surfaces at boot, not at the first
-     *   failed dispatch.
+     * @param  array<string, RetrySettings>  $settings  Keyed by `Channel->value`.
+     *                                                  The constructor verifies every `Channel` case has a settings row
+     *                                                  so that a missing channel surfaces at boot, not at the first
+     *                                                  failed dispatch.
      */
     public function __construct(
         private readonly array $settings,
@@ -75,7 +75,7 @@ final class ChannelRetryPolicy implements RetryPolicy
             if (! isset($this->settings[$channel->value])) {
                 throw new \LogicException(sprintf(
                     'ChannelRetryPolicy is missing settings for channel "%s". '
-                    . 'Add a row to config/eventpulse.php under "retry".',
+                    .'Add a row to config/eventpulse.php under "retry".',
                     $channel->value,
                 ));
             }
@@ -101,8 +101,8 @@ final class ChannelRetryPolicy implements RetryPolicy
         // matches the spec table's "Base delay" column meaning
         // "the delay after the first failure."
         $baseSeconds = $settings->baseDelaySeconds;
-        $maxSeconds  = $settings->maxDelaySeconds;
-        $exponent    = $failedAttemptNumber->toInt() - 1;
+        $maxSeconds = $settings->maxDelaySeconds;
+        $exponent = $failedAttemptNumber->toInt() - 1;
 
         // 2^exponent grows fast; we clamp before multiplication to
         // avoid overflow for large attempt numbers (theoretical — the
@@ -111,7 +111,7 @@ final class ChannelRetryPolicy implements RetryPolicy
         $multiplier = $exponent >= 31 ? PHP_INT_MAX : (1 << $exponent);
 
         $rawDelaySeconds = $baseSeconds * $multiplier;
-        $cappedSeconds   = min($rawDelaySeconds, $maxSeconds);
+        $cappedSeconds = min($rawDelaySeconds, $maxSeconds);
 
         // Jitter: a uniform random offset in [-jitter, +jitter] applied
         // as a multiplicative factor (1 + offset). The result is always

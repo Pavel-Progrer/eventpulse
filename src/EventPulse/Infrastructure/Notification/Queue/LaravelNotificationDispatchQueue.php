@@ -85,9 +85,9 @@ final class LaravelNotificationDispatchQueue implements NotificationDispatchQueu
     private function queueFor(Priority $priority): string
     {
         return match ($priority) {
-            Priority::High   => 'notifications-high',
+            Priority::High => 'notifications-high',
             Priority::Normal => 'notifications-default',
-            Priority::Low    => 'notifications-low',
+            Priority::Low => 'notifications-low',
         };
     }
 }

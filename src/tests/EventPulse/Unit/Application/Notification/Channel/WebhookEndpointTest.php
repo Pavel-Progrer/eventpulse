@@ -70,7 +70,7 @@ final class WebhookEndpointTest extends TestCase
     public function has_signing_when_secret_is_provided(): void
     {
         $endpoint = new WebhookEndpoint(
-            url:           'https://hooks.example.com/notify',
+            url: 'https://hooks.example.com/notify',
             signingSecret: 'my-32-char-secret-for-hmac-signing',
         );
 
@@ -85,7 +85,7 @@ final class WebhookEndpointTest extends TestCase
         $this->expectExceptionMessage('must not be an empty string');
 
         new WebhookEndpoint(
-            url:           'https://hooks.example.com/notify',
+            url: 'https://hooks.example.com/notify',
             signingSecret: '',
         );
     }

@@ -39,7 +39,7 @@ final class DisableWebhookDestinationController
 
         $command = new DisableWebhookDestinationCommand(
             destinationId: $id,
-            apiKeyId:      (string) $apiKey->id,
+            apiKeyId: (string) $apiKey->id,
             correlationId: $request->header('X-Correlation-ID'),
         );
 

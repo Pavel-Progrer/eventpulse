@@ -28,11 +28,11 @@ use EventPulse\Domain\Notification\ValueObject\AttemptNumber;
 final class StaticRetryPolicy implements RetryPolicy
 {
     /**
-     * @param array<string, array{max:int, delay:DateInterval}> $byChannel
-     *   Keyed by `Channel->value`. Channels not present default to the
-     *   `$default` row.
-     * @param array{max:int, delay:DateInterval} $default
-     *   The fallback row used for any channel not in `$byChannel`.
+     * @param  array<string, array{max:int, delay:DateInterval}>  $byChannel
+     *                                                                        Keyed by `Channel->value`. Channels not present default to the
+     *                                                                        `$default` row.
+     * @param  array{max:int, delay:DateInterval}  $default
+     *                                                       The fallback row used for any channel not in `$byChannel`.
      */
     private function __construct(
         private readonly array $byChannel,
@@ -47,8 +47,8 @@ final class StaticRetryPolicy implements RetryPolicy
     {
         return new self(
             byChannel: [],
-            default:   [
-                'max'   => $max,
+            default: [
+                'max' => $max,
                 'delay' => new DateInterval(sprintf('PT%dS', $delaySeconds)),
             ],
         );
@@ -58,10 +58,10 @@ final class StaticRetryPolicy implements RetryPolicy
      * Different values per channel. Use when a single test exercises
      * the "max-attempts and delay differ between channels" behaviour.
      *
-     * @param array<string, array{max:int, delay_seconds:int}> $overrides
-     *   Keyed by `Channel->value`. Each row supplies an override for
-     *   the corresponding channel; channels not listed fall back to
-     *   `$defaultMax` / `$defaultDelaySeconds`.
+     * @param  array<string, array{max:int, delay_seconds:int}>  $overrides
+     *                                                                       Keyed by `Channel->value`. Each row supplies an override for
+     *                                                                       the corresponding channel; channels not listed fall back to
+     *                                                                       `$defaultMax` / `$defaultDelaySeconds`.
      */
     public static function perChannel(
         int $defaultMax = 3,
@@ -72,15 +72,15 @@ final class StaticRetryPolicy implements RetryPolicy
 
         foreach ($overrides as $channelValue => $row) {
             $by[$channelValue] = [
-                'max'   => (int) $row['max'],
+                'max' => (int) $row['max'],
                 'delay' => new DateInterval(sprintf('PT%dS', (int) $row['delay_seconds'])),
             ];
         }
 
         return new self(
             byChannel: $by,
-            default:   [
-                'max'   => $defaultMax,
+            default: [
+                'max' => $defaultMax,
                 'delay' => new DateInterval(sprintf('PT%dS', $defaultDelaySeconds)),
             ],
         );

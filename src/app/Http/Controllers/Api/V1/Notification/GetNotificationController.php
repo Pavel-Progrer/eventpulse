@@ -37,7 +37,7 @@ final class GetNotificationController
 
         $notification = ($this->handler)(new GetNotificationQuery(
             notificationId: $id,
-            apiKeyId:       (string) $apiKey->id,
+            apiKeyId: (string) $apiKey->id,
         ));
 
         // `include=payload` is reserved for admin-scoped keys (Phase 1
@@ -45,8 +45,8 @@ final class GetNotificationController
         // ships in a later iteration). For now, always omit the payload
         // unless the caller has explicitly been granted admin scope AND
         // passes `include=payload`.
-        $hasAdminScope   = in_array('admin', (array) $apiKey->scopes, strict: true);
-        $includePayload  = $hasAdminScope
+        $hasAdminScope = in_array('admin', (array) $apiKey->scopes, strict: true);
+        $includePayload = $hasAdminScope
             && str_contains((string) $request->query('include', ''), 'payload');
 
         $resource = $includePayload

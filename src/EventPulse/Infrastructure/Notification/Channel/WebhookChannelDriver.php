@@ -64,9 +64,12 @@ use Psr\Log\LoggerInterface;
 final class WebhookChannelDriver implements ChannelDriver
 {
     private const int    RESPONSE_BODY_SNIPPET_BYTES = 1024;
-    private const int    DEFAULT_TIMEOUT_SECONDS     = 30;
-    private const string USER_AGENT                  = 'EventPulse/1.0';
-    private const string SIGNATURE_ALGORITHM         = 'sha256';
+
+    private const int    DEFAULT_TIMEOUT_SECONDS = 30;
+
+    private const string USER_AGENT = 'EventPulse/1.0';
+
+    private const string SIGNATURE_ALGORITHM = 'sha256';
 
     /**
      * Headers a caller is not allowed to override via the payload's `headers`
@@ -100,7 +103,7 @@ final class WebhookChannelDriver implements ChannelDriver
     #[\Override]
     public function dispatch(DispatchRequest $request): DispatchOutcome
     {
-        if (!$request->recipient instanceof WebhookRecipient) {
+        if (! $request->recipient instanceof WebhookRecipient) {
             throw new \LogicException(sprintf(
                 'WebhookChannelDriver received a %s recipient; expected WebhookRecipient.',
                 $request->recipient::class,
@@ -108,38 +111,38 @@ final class WebhookChannelDriver implements ChannelDriver
         }
 
         $logContext = [
-            'event'           => 'notification.webhook.dispatch',
+            'event' => 'notification.webhook.dispatch',
             'notification_id' => $request->notificationId->toString(),
-            'attempt_number'  => $request->attemptNumber->toInt(),
-            'destination_id'  => $request->recipient->destinationId(),
-            'correlation_id'  => $request->correlationId->toString(),
+            'attempt_number' => $request->attemptNumber->toInt(),
+            'destination_id' => $request->recipient->destinationId(),
+            'correlation_id' => $request->correlationId->toString(),
         ];
 
         try {
             $endpoint = $this->endpointResolver->resolve($request->recipient);
         } catch (WebhookEndpointResolutionException $e) {
             $this->logger->warning('notification.webhook.endpoint_resolution_failed', $logContext + [
-                'reason'         => $e->getMessage(),
+                'reason' => $e->getMessage(),
                 'classification' => $e->classification->value,
             ]);
 
             return DispatchOutcome::failure(
                 classification: $e->classification,
-                reason:         $e->getMessage(),
+                reason: $e->getMessage(),
             );
         }
 
         [$body, $extraHeaders] = $this->extractBodyAndHeaders($request->payload->toArray());
 
         $timestamp = (string) time();
-        $bodyJson  = json_encode($body, JSON_THROW_ON_ERROR);
+        $bodyJson = json_encode($body, JSON_THROW_ON_ERROR);
 
         $headers = $this->buildRequestHeaders(
-            request:      $request,
+            request: $request,
             extraHeaders: $extraHeaders,
-            endpoint:     $endpoint,
-            timestamp:    $timestamp,
-            bodyJson:     $bodyJson,
+            endpoint: $endpoint,
+            timestamp: $timestamp,
+            bodyJson: $bodyJson,
         );
 
         try {
@@ -149,26 +152,26 @@ final class WebhookChannelDriver implements ChannelDriver
                 ->post($endpoint->url(), $body);
         } catch (ConnectionException $e) {
             $this->logger->warning('notification.webhook.connection_failed', $logContext + [
-                'url'             => $endpoint->url(),
+                'url' => $endpoint->url(),
                 'exception_class' => $e::class,
-                'reason'          => $e->getMessage(),
-                'classification'  => FailureClassification::Transient->value,
+                'reason' => $e->getMessage(),
+                'classification' => FailureClassification::Transient->value,
             ]);
 
             return DispatchOutcome::failure(
                 classification: FailureClassification::Transient,
-                reason:         sprintf('connection failure: %s', $e->getMessage()),
+                reason: sprintf('connection failure: %s', $e->getMessage()),
             );
         } catch (\Throwable $e) {
             $this->logger->error('notification.webhook.unexpected_error', $logContext + [
-                'url'             => $endpoint->url(),
+                'url' => $endpoint->url(),
                 'exception_class' => $e::class,
-                'reason'          => $e->getMessage(),
+                'reason' => $e->getMessage(),
             ]);
 
             return DispatchOutcome::failure(
                 classification: FailureClassification::Transient,
-                reason:         sprintf('%s: %s', $e::class, $e->getMessage()),
+                reason: sprintf('%s: %s', $e::class, $e->getMessage()),
             );
         }
 
@@ -197,9 +200,9 @@ final class WebhookChannelDriver implements ChannelDriver
      */
     private function computeSignature(string $secret, string $timestamp, string $bodyJson): string
     {
-        $signedPayload = $timestamp . '.' . $bodyJson;
+        $signedPayload = $timestamp.'.'.$bodyJson;
 
-        return self::SIGNATURE_ALGORITHM . '=' . hash_hmac(
+        return self::SIGNATURE_ALGORITHM.'='.hash_hmac(
             self::SIGNATURE_ALGORITHM,
             $signedPayload,
             $secret,
@@ -211,14 +214,14 @@ final class WebhookChannelDriver implements ChannelDriver
     // ---------------------------------------------------------------------------
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{0: array<string, mixed>, 1: array<string, string>}
      */
     private function extractBodyAndHeaders(array $payload): array
     {
         // OpenAPI shape: {body: {...}, headers?: {...}}
         if (isset($payload['body']) && is_array($payload['body'])) {
-            $body    = $payload['body'];
+            $body = $payload['body'];
             $headers = [];
 
             if (isset($payload['headers']) && is_array($payload['headers'])) {
@@ -237,7 +240,7 @@ final class WebhookChannelDriver implements ChannelDriver
     }
 
     /**
-     * @param array<string, string> $extraHeaders
+     * @param  array<string, string>  $extraHeaders
      * @return array<string, string>
      */
     private function buildRequestHeaders(
@@ -248,11 +251,11 @@ final class WebhookChannelDriver implements ChannelDriver
         string $bodyJson,
     ): array {
         $headers = [
-            'Content-Type'                 => 'application/json',
-            'User-Agent'                   => self::USER_AGENT,
+            'Content-Type' => 'application/json',
+            'User-Agent' => self::USER_AGENT,
             'X-EventPulse-Notification-ID' => $request->notificationId->toString(),
-            'X-EventPulse-Attempt'         => (string) $request->attemptNumber->toInt(),
-            'X-Correlation-ID'             => $request->correlationId->toString(),
+            'X-EventPulse-Attempt' => (string) $request->attemptNumber->toInt(),
+            'X-Correlation-ID' => $request->correlationId->toString(),
         ];
 
         if ($endpoint->hasSigning()) {
@@ -263,9 +266,9 @@ final class WebhookChannelDriver implements ChannelDriver
             // path clean.
             $headers['X-EventPulse-Timestamp'] = $timestamp;
             $headers['X-EventPulse-Signature'] = $this->computeSignature(
-                secret:    (string) $endpoint->signingSecret(),
+                secret: (string) $endpoint->signingSecret(),
                 timestamp: $timestamp,
-                bodyJson:  $bodyJson,
+                bodyJson: $bodyJson,
             );
         }
 
@@ -280,7 +283,7 @@ final class WebhookChannelDriver implements ChannelDriver
     }
 
     /**
-     * @param array<string, mixed> $logContext
+     * @param  array<string, mixed>  $logContext
      */
     private function classifyResponse(Response $response, string $url, array $logContext): DispatchOutcome
     {
@@ -288,7 +291,7 @@ final class WebhookChannelDriver implements ChannelDriver
 
         if ($response->successful()) {
             $this->logger->debug('notification.webhook.dispatched', $logContext + [
-                'url'         => $url,
+                'url' => $url,
                 'http_status' => $status,
             ]);
 
@@ -300,15 +303,15 @@ final class WebhookChannelDriver implements ChannelDriver
         $classification = $this->classifyHttpStatus($status);
 
         $this->logger->warning('notification.webhook.dispatch_failed', $logContext + [
-            'url'            => $url,
-            'http_status'    => $status,
+            'url' => $url,
+            'http_status' => $status,
             'classification' => $classification->value,
-            'response_body'  => $bodySnippet,
+            'response_body' => $bodySnippet,
         ]);
 
         return DispatchOutcome::failure(
             classification: $classification,
-            reason:         sprintf(
+            reason: sprintf(
                 'webhook receiver returned HTTP %d: %s',
                 $status,
                 $bodySnippet === '' ? '(empty body)' : $bodySnippet,

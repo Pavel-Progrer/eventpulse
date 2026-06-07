@@ -18,9 +18,9 @@ namespace EventPulse\Domain\Notification\Enum;
  */
 enum Channel: string
 {
-    case Email   = 'email';
+    case Email = 'email';
     case Webhook = 'webhook';
-    case Sms     = 'sms';
+    case Sms = 'sms';
 
     /**
      * Human-readable label, kept close to the enum so display concerns
@@ -28,10 +28,10 @@ enum Channel: string
      */
     public function label(): string
     {
-        return match($this) {
-            Channel::Email   => 'Email',
+        return match ($this) {
+            Channel::Email => 'Email',
             Channel::Webhook => 'Webhook',
-            Channel::Sms     => 'SMS',
+            Channel::Sms => 'SMS',
         };
     }
 }

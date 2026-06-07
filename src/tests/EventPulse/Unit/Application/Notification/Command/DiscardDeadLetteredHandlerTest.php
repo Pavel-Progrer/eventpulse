@@ -28,14 +28,15 @@ final class DiscardDeadLetteredHandlerTest extends TestCase
     private const string MISSING_ID = 'a0000000-0000-4000-8000-000000000001';
 
     private InMemoryNotificationRepository $repository;
+
     private DiscardDeadLetteredHandler $handler;
 
     protected function setUp(): void
     {
-        $this->repository = new InMemoryNotificationRepository();
-        $this->handler    = new DiscardDeadLetteredHandler(
+        $this->repository = new InMemoryNotificationRepository;
+        $this->handler = new DiscardDeadLetteredHandler(
             repository: $this->repository,
-            clock:      new FixedClock(NotificationMother::now()),
+            clock: new FixedClock(NotificationMother::now()),
         );
     }
 
@@ -45,7 +46,7 @@ final class DiscardDeadLetteredHandlerTest extends TestCase
     ): DiscardDeadLetteredCommand {
         return new DiscardDeadLetteredCommand(
             notificationId: $notificationId,
-            apiKeyId:       $apiKeyId,
+            apiKeyId: $apiKeyId,
         );
     }
 
@@ -79,7 +80,7 @@ final class DiscardDeadLetteredHandlerTest extends TestCase
 
         ($this->handler)($this->command(
             notificationId: $notification->id()->toString(),
-            apiKeyId:       'different-api-key',
+            apiKeyId: 'different-api-key',
         ));
     }
 

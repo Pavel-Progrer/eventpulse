@@ -34,14 +34,14 @@ final class ListNotificationsController
         $apiKey = $request->attributes->get('api_key');
 
         $query = new ListNotificationsQuery(
-            apiKeyId:       (string) $apiKey->id,
-            statuses:       $this->parseStatuses($request->validated('status', [])),
-            channels:       $this->parseChannels($request->validated('channel', [])),
-            correlationId:  $request->validated('correlation_id'),
-            createdAfter:   $this->parseDateTime($request->validated('created_after')),
-            createdBefore:  $this->parseDateTime($request->validated('created_before')),
-            limit:          (int) $request->validated('limit', 50),
-            cursor:         $request->validated('cursor'),
+            apiKeyId: (string) $apiKey->id,
+            statuses: $this->parseStatuses($request->validated('status', [])),
+            channels: $this->parseChannels($request->validated('channel', [])),
+            correlationId: $request->validated('correlation_id'),
+            createdAfter: $this->parseDateTime($request->validated('created_after')),
+            createdBefore: $this->parseDateTime($request->validated('created_before')),
+            limit: (int) $request->validated('limit', 50),
+            cursor: $request->validated('cursor'),
         );
 
         $page = ($this->handler)($query);
@@ -50,7 +50,7 @@ final class ListNotificationsController
     }
 
     /**
-     * @param  list<string>            $raw
+     * @param  list<string>  $raw
      * @return list<NotificationStatus>
      */
     private function parseStatuses(array $raw): array

@@ -23,6 +23,7 @@ use EventPulse\Domain\Notification\Exception\InvalidNotificationInputException;
 final class IdempotencyKey
 {
     private const MIN_LENGTH = 1;
+
     private const MAX_LENGTH = 255;
 
     private function __construct(
@@ -45,7 +46,7 @@ final class IdempotencyKey
         }
 
         // Reject non-printable characters and non-ASCII bytes.
-        if (!preg_match('/^[\x21-\x7E]+$/', $value)) {
+        if (! preg_match('/^[\x21-\x7E]+$/', $value)) {
             throw new InvalidNotificationInputException(
                 'IdempotencyKey must contain only printable ASCII characters (0x21–0x7E).'
             );

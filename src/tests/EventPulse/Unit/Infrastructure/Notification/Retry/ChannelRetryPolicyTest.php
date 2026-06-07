@@ -30,12 +30,17 @@ final class ChannelRetryPolicyTest extends TestCase
     /**
      * Spec values, used by tests that mirror the §5.2 table directly.
      */
-    private const WEBHOOK_BASE   = 10;
-    private const WEBHOOK_MAX    = 3600;
-    private const EMAIL_BASE     = 30;
-    private const EMAIL_MAX      = 1800;
-    private const SMS_BASE       = 15;
-    private const SMS_MAX        = 600;
+    private const WEBHOOK_BASE = 10;
+
+    private const WEBHOOK_MAX = 3600;
+
+    private const EMAIL_BASE = 30;
+
+    private const EMAIL_MAX = 1800;
+
+    private const SMS_BASE = 15;
+
+    private const SMS_MAX = 600;
 
     #[Test]
     public function max_attempts_returns_configured_value_per_channel(): void
@@ -56,7 +61,7 @@ final class ChannelRetryPolicyTest extends TestCase
         new ChannelRetryPolicy(
             settings: [
                 Channel::Webhook->value => $this->settings(6, self::WEBHOOK_BASE, self::WEBHOOK_MAX, 0.0),
-                Channel::Email->value   => $this->settings(4, self::EMAIL_BASE,   self::EMAIL_MAX,   0.0),
+                Channel::Email->value => $this->settings(4, self::EMAIL_BASE, self::EMAIL_MAX, 0.0),
                 // sms intentionally absent
             ],
             randomizer: $this->seededRandomizer(),
@@ -131,8 +136,8 @@ final class ChannelRetryPolicyTest extends TestCase
     public static function specBaseDelays(): iterable
     {
         yield 'webhook first failure → 10s base' => [Channel::Webhook, 1, self::WEBHOOK_BASE];
-        yield 'email first failure → 30s base'   => [Channel::Email,   1, self::EMAIL_BASE];
-        yield 'sms first failure → 15s base'     => [Channel::Sms,     1, self::SMS_BASE];
+        yield 'email first failure → 30s base' => [Channel::Email,   1, self::EMAIL_BASE];
+        yield 'sms first failure → 15s base' => [Channel::Sms,     1, self::SMS_BASE];
     }
 
     #[Test]
@@ -161,8 +166,8 @@ final class ChannelRetryPolicyTest extends TestCase
         $policy = new ChannelRetryPolicy(
             settings: [
                 Channel::Webhook->value => $this->settings(6, 100, 100_000, 0.25),
-                Channel::Email->value   => $this->settings(4, self::EMAIL_BASE, self::EMAIL_MAX, 0.0),
-                Channel::Sms->value     => $this->settings(3, self::SMS_BASE,   self::SMS_MAX,   0.0),
+                Channel::Email->value => $this->settings(4, self::EMAIL_BASE, self::EMAIL_MAX, 0.0),
+                Channel::Sms->value => $this->settings(3, self::SMS_BASE, self::SMS_MAX, 0.0),
             ],
             randomizer: $this->seededRandomizer(),
         );
@@ -179,7 +184,7 @@ final class ChannelRetryPolicyTest extends TestCase
         $max = max($samples);
 
         // Every sample is inside the ±25% window around 100.
-        self::assertGreaterThanOrEqual(75,  $min, 'A sample fell below the -25% jitter floor.');
+        self::assertGreaterThanOrEqual(75, $min, 'A sample fell below the -25% jitter floor.');
         self::assertLessThanOrEqual(125, $max, 'A sample exceeded the +25% jitter ceiling.');
 
         // And jitter is actually doing something — not all 200
@@ -215,10 +220,10 @@ final class ChannelRetryPolicyTest extends TestCase
         // Spot-check the four invariants RetrySettings enforces. A
         // misconfiguration in any of them produces silently wrong
         // behaviour later — we want it to fail at construction.
-        $this->expectExceptionAndRunSettings(0,  10, 100, 0.25, 'maxAttempts must be ≥ 1');
+        $this->expectExceptionAndRunSettings(0, 10, 100, 0.25, 'maxAttempts must be ≥ 1');
         $this->expectExceptionAndRunSettings(3, -5, 100, 0.25, 'baseDelaySeconds must be ≥ 0');
         $this->expectExceptionAndRunSettings(3, 100, 50, 0.25, 'maxDelaySeconds (50) must be ≥ baseDelaySeconds (100)');
-        $this->expectExceptionAndRunSettings(3,  10, 100, 1.0,  'jitterFraction must be in [0, 1)');
+        $this->expectExceptionAndRunSettings(3, 10, 100, 1.0, 'jitterFraction must be in [0, 1)');
     }
 
     private function expectExceptionAndRunSettings(
@@ -248,8 +253,8 @@ final class ChannelRetryPolicyTest extends TestCase
         return new ChannelRetryPolicy(
             settings: [
                 Channel::Webhook->value => $this->settings(6, self::WEBHOOK_BASE, self::WEBHOOK_MAX, 0.0),
-                Channel::Email->value   => $this->settings(4, self::EMAIL_BASE,   self::EMAIL_MAX,   0.0),
-                Channel::Sms->value     => $this->settings(3, self::SMS_BASE,     self::SMS_MAX,     0.0),
+                Channel::Email->value => $this->settings(4, self::EMAIL_BASE, self::EMAIL_MAX, 0.0),
+                Channel::Sms->value => $this->settings(3, self::SMS_BASE, self::SMS_MAX, 0.0),
             ],
             randomizer: $this->seededRandomizer(),
         );
@@ -266,18 +271,18 @@ final class ChannelRetryPolicyTest extends TestCase
     {
         return [
             Channel::Webhook->value => $this->settings(6, self::WEBHOOK_BASE, self::WEBHOOK_MAX, 0.25),
-            Channel::Email->value   => $this->settings(4, self::EMAIL_BASE,   self::EMAIL_MAX,   0.25),
-            Channel::Sms->value     => $this->settings(3, self::SMS_BASE,     self::SMS_MAX,     0.25),
+            Channel::Email->value => $this->settings(4, self::EMAIL_BASE, self::EMAIL_MAX, 0.25),
+            Channel::Sms->value => $this->settings(3, self::SMS_BASE, self::SMS_MAX, 0.25),
         ];
     }
 
     private function settings(int $max, int $base, int $maxDelay, float $jitter): RetrySettings
     {
         return new RetrySettings(
-            maxAttempts:      $max,
+            maxAttempts: $max,
             baseDelaySeconds: $base,
-            maxDelaySeconds:  $maxDelay,
-            jitterFraction:   $jitter,
+            maxDelaySeconds: $maxDelay,
+            jitterFraction: $jitter,
         );
     }
 

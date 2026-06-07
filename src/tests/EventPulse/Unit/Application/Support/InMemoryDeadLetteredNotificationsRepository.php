@@ -49,7 +49,7 @@ final class InMemoryDeadLetteredNotificationsRepository implements DeadLetteredN
     {
         $matching = array_values(array_filter(
             $this->rows,
-            fn(array $row): bool => $this->matches($row, $query),
+            fn (array $row): bool => $this->matches($row, $query),
         ));
 
         // Sort: dead_lettered_at desc, id desc (tiebreaker).
@@ -80,22 +80,22 @@ final class InMemoryDeadLetteredNotificationsRepository implements DeadLetteredN
 
         // limit + 1 trick.
         $hasMore = count($matching) > $query->limit;
-        $page    = array_slice($matching, 0, $query->limit);
+        $page = array_slice($matching, 0, $query->limit);
 
-        $entries = array_map(static fn(array $row): DlqEntry => $row['entry'], $page);
+        $entries = array_map(static fn (array $row): DlqEntry => $row['entry'], $page);
 
         $nextCursor = null;
         if ($hasMore && $page !== []) {
             $last = end($page)['entry'];
             $nextCursor = $last->deadLetteredAt->format(\DateTimeInterface::ATOM)
-                . '|' . $last->id;
+                .'|'.$last->id;
         }
 
         return new DlqEntryPage($entries, $nextCursor);
     }
 
     /**
-     * @param array{apiKeyId: string, entry: DlqEntry} $row
+     * @param  array{apiKeyId: string, entry: DlqEntry}  $row
      */
     private function matches(array $row, ListDeadLetteredQuery $query): bool
     {

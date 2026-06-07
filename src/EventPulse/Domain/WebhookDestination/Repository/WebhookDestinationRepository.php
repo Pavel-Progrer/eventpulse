@@ -36,11 +36,11 @@ interface WebhookDestinationRepository
     /**
      * Persists a new or updated `WebhookDestination`.
      *
-     * @param string|null $secret Plaintext signing secret. Must be provided
-     *   on the first `save()` call for a new aggregate; may be `null` on
-     *   subsequent saves (e.g., after `disable()`) because the secret is
-     *   immutable after creation and the repository does not overwrite it
-     *   when null is passed. Implementations must enforce this contract.
+     * @param  string|null  $secret  Plaintext signing secret. Must be provided
+     *                               on the first `save()` call for a new aggregate; may be `null` on
+     *                               subsequent saves (e.g., after `disable()`) because the secret is
+     *                               immutable after creation and the repository does not overwrite it
+     *                               when null is passed. Implementations must enforce this contract.
      */
     public function save(WebhookDestination $destination, ?string $secret = null): void;
 

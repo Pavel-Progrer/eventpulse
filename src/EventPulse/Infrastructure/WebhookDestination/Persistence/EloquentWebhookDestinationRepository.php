@@ -43,9 +43,9 @@ final class EloquentWebhookDestinationRepository implements WebhookDestinationRe
 
         // These fields are always written (status changes on disable).
         $model->api_key_id = $destination->apiKeyId();
-        $model->url        = $destination->url();
-        $model->name       = $destination->name();
-        $model->status     = $destination->status()->value;
+        $model->url = $destination->url();
+        $model->name = $destination->name();
+        $model->status = $destination->status()->value;
 
         // The secret is written only on the first save. Subsequent calls
         // (e.g., after disable()) pass null and must not overwrite the
@@ -107,17 +107,17 @@ final class EloquentWebhookDestinationRepository implements WebhookDestinationRe
             if ($pivot !== null) {
                 $query->where(function ($q) use ($pivot): void {
                     $q->where('created_at', '<', $pivot->created_at)
-                      ->orWhere(function ($q2) use ($pivot): void {
-                          $q2->where('created_at', '=', $pivot->created_at)
-                             ->where('id', '<', $pivot->id);
-                      });
+                        ->orWhere(function ($q2) use ($pivot): void {
+                            $q2->where('created_at', '=', $pivot->created_at)
+                                ->where('id', '<', $pivot->id);
+                        });
                 });
             }
         }
 
         return $query
             ->get()
-            ->map(fn(EloquentWebhookDestination $m): WebhookDestination => $this->hydrate($m))
+            ->map(fn (EloquentWebhookDestination $m): WebhookDestination => $this->hydrate($m))
             ->all();
     }
 
@@ -128,11 +128,11 @@ final class EloquentWebhookDestinationRepository implements WebhookDestinationRe
     private function hydrate(EloquentWebhookDestination $model): WebhookDestination
     {
         return WebhookDestination::reconstitute(
-            id:        WebhookDestinationId::fromString($model->id),
-            apiKeyId:  $model->api_key_id,
-            url:       $model->url,
-            name:      $model->name,
-            status:    WebhookDestinationStatus::from($model->status),
+            id: WebhookDestinationId::fromString($model->id),
+            apiKeyId: $model->api_key_id,
+            url: $model->url,
+            name: $model->name,
+            status: WebhookDestinationStatus::from($model->status),
             createdAt: new DateTimeImmutable($model->created_at->toIso8601String()),
         );
     }

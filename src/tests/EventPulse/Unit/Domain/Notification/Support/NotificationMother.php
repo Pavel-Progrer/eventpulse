@@ -55,15 +55,15 @@ final class NotificationMother
         string $apiKeyId = 'api-key-uuid-0001',
     ): Notification {
         return Notification::request(
-            id:             $id ?? self::id(),
-            channel:        Channel::Email,
-            recipient:      EmailRecipient::fromString('test@example.com'),
-            rawPayload:     ['subject' => 'Hello', 'text' => 'World'],
-            priority:       $priority,
+            id: $id ?? self::id(),
+            channel: Channel::Email,
+            recipient: EmailRecipient::fromString('test@example.com'),
+            rawPayload: ['subject' => 'Hello', 'text' => 'World'],
+            priority: $priority,
             idempotencyKey: self::idempotencyKey(),
-            apiKeyId:       $apiKeyId,
-            correlationId:  self::correlationId(),
-            now:            self::now(),
+            apiKeyId: $apiKeyId,
+            correlationId: self::correlationId(),
+            now: self::now(),
         );
     }
 
@@ -72,30 +72,30 @@ final class NotificationMother
         string $apiKeyId = 'api-key-uuid-0001',
     ): Notification {
         return Notification::request(
-            id:             $id ?? self::id(),
-            channel:        Channel::Webhook,
-            recipient:      WebhookRecipient::fromDestinationId('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'),
-            rawPayload:     ['event' => 'order.created', 'order_id' => 42],
-            priority:       Priority::Normal,
+            id: $id ?? self::id(),
+            channel: Channel::Webhook,
+            recipient: WebhookRecipient::fromDestinationId('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'),
+            rawPayload: ['event' => 'order.created', 'order_id' => 42],
+            priority: Priority::Normal,
             idempotencyKey: self::idempotencyKey(),
-            apiKeyId:       $apiKeyId,
-            correlationId:  self::correlationId(),
-            now:            self::now(),
+            apiKeyId: $apiKeyId,
+            correlationId: self::correlationId(),
+            now: self::now(),
         );
     }
 
     public static function smsNotification(?NotificationId $id = null): Notification
     {
         return Notification::request(
-            id:             $id ?? self::id(),
-            channel:        Channel::Sms,
-            recipient:      SmsRecipient::fromE164('+381641234567'),
-            rawPayload:     ['body' => 'Your code is 1234'],
-            priority:       Priority::High,
+            id: $id ?? self::id(),
+            channel: Channel::Sms,
+            recipient: SmsRecipient::fromE164('+381641234567'),
+            rawPayload: ['body' => 'Your code is 1234'],
+            priority: Priority::High,
             idempotencyKey: self::idempotencyKey(),
-            apiKeyId:       'api-key-uuid-0001',
-            correlationId:  self::correlationId(),
-            now:            self::now(),
+            apiKeyId: 'api-key-uuid-0001',
+            correlationId: self::correlationId(),
+            now: self::now(),
         );
     }
 
@@ -104,12 +104,13 @@ final class NotificationMother
         $n = self::emailNotification();
         $n->beginAttempt(self::now());
         $n->pullPendingEvents();
+
         return $n;
     }
 
     public static function deadLetteredNotification(int $maxAttempts = 3): Notification
     {
-        $n          = self::emailNotification();
+        $n = self::emailNotification();
         $retryAfter = self::later(30);
 
         for ($i = 0; $i < $maxAttempts; $i++) {
@@ -124,6 +125,7 @@ final class NotificationMother
         }
 
         $n->pullPendingEvents();
+
         return $n;
     }
 }

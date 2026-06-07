@@ -39,7 +39,8 @@ use Illuminate\Support\Facades\Schema;
  * `name` is nullable (column default null) — the OpenAPI spec declares it
  * optional and many callers won't provide it.
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('webhook_destinations', function (Blueprint $table): void {

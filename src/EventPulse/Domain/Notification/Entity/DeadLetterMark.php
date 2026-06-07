@@ -33,6 +33,7 @@ use EventPulse\Domain\Notification\ValueObject\NotificationId;
 final class DeadLetterMark
 {
     private ?NotificationId $replayNotificationId = null;
+
     private ?DateTimeImmutable $replayedAt = null;
 
     /**
@@ -61,7 +62,7 @@ final class DeadLetterMark
         }
 
         $this->replayNotificationId = $replayNotificationId;
-        $this->replayedAt           = $replayedAt;
+        $this->replayedAt = $replayedAt;
     }
 
     /**
@@ -75,7 +76,7 @@ final class DeadLetterMark
         DateTimeImmutable $replayedAt,
     ): void {
         $this->replayNotificationId = $replayNotificationId;
-        $this->replayedAt           = $replayedAt;
+        $this->replayedAt = $replayedAt;
     }
 
     public function reason(): string

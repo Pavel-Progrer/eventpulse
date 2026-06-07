@@ -92,7 +92,7 @@ final class SubmitNotificationIdempotencyTest extends SubmitNotificationFeatureT
             $this->headersFor(
                 $this->writerKey,
                 idempotencyKey: 'idem-replay-ddd',
-                correlationId:  'req_first_request',
+                correlationId: 'req_first_request',
             ),
         );
         $first->assertStatus(202);
@@ -106,7 +106,7 @@ final class SubmitNotificationIdempotencyTest extends SubmitNotificationFeatureT
             $this->headersFor(
                 $this->writerKey,
                 idempotencyKey: 'idem-replay-ddd',
-                correlationId:  'req_second_request_different',
+                correlationId: 'req_second_request_different',
             ),
         );
         $second->assertStatus(200);
@@ -126,9 +126,9 @@ final class SubmitNotificationIdempotencyTest extends SubmitNotificationFeatureT
             $this->headersFor($this->writerKey, idempotencyKey: 'idem-conflict-aaa'),
         )->assertStatus(202);
 
-        $different            = $this->validEmailBody();
+        $different = $this->validEmailBody();
         $different['payload'] = [
-            'subject'   => 'Different subject',
+            'subject' => 'Different subject',
             'body_text' => 'Different body',
         ];
 
@@ -152,7 +152,7 @@ final class SubmitNotificationIdempotencyTest extends SubmitNotificationFeatureT
             $this->headersFor($this->writerKey, idempotencyKey: 'idem-conflict-bbb'),
         )->assertStatus(202);
 
-        $different              = $this->validEmailBody();
+        $different = $this->validEmailBody();
         $different['recipient'] = 'someone-else@example.com';
 
         $this->postJson(
@@ -171,7 +171,7 @@ final class SubmitNotificationIdempotencyTest extends SubmitNotificationFeatureT
             $this->headersFor($this->writerKey, idempotencyKey: 'idem-conflict-ccc'),
         )->assertStatus(202);
 
-        $different              = $this->validEmailBody();
+        $different = $this->validEmailBody();
         $different['recipient'] = 'someone-else@example.com';
 
         $this->postJson(

@@ -34,7 +34,7 @@ final class DiscardDlqController
 
         ($this->handler)(new DiscardDeadLetteredCommand(
             notificationId: $id,
-            apiKeyId:       (string) $apiKey->id,
+            apiKeyId: (string) $apiKey->id,
         ));
 
         return response()->json(null, Response::HTTP_NO_CONTENT);

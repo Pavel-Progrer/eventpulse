@@ -36,9 +36,9 @@ final class InMemoryNotificationDispatchQueue implements NotificationDispatchQue
     ): void {
         $this->enqueued[] = new EnqueuedDispatch(
             notificationId: $notificationId,
-            correlationId:  $correlationId,
-            priority:       $priority,
-            availableAt:    $availableAt,
+            correlationId: $correlationId,
+            priority: $priority,
+            availableAt: $availableAt,
         );
     }
 

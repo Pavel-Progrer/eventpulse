@@ -34,7 +34,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ThrottleIpRequests
 {
-    private const int LIMIT          = 60;
+    private const int LIMIT = 60;
+
     private const int WINDOW_SECONDS = 60;
 
     public function __construct(
@@ -48,7 +49,7 @@ final class ThrottleIpRequests
         // to 'unknown' means all such requests share one bucket, which is acceptable
         // here: the `api` middleware group guarantees a real HTTP context for every
         // route this middleware is attached to.
-        $ip  = $request->ip() ?? 'unknown';
+        $ip = $request->ip() ?? 'unknown';
         $key = sprintf('eventpulse:rl:ip:%s', $ip);
 
         if ($this->limiter->tooManyAttempts($key, self::LIMIT)) {
@@ -56,13 +57,13 @@ final class ThrottleIpRequests
 
             return new JsonResponse([
                 'error' => [
-                    'code'    => 'RATE_LIMITED',
+                    'code' => 'RATE_LIMITED',
                     'message' => 'You have exceeded the rate limit for this endpoint.',
                     'details' => ['retry_after' => $retryAfter],
                 ],
             ], Response::HTTP_TOO_MANY_REQUESTS, [
-                'Retry-After'           => (string) $retryAfter,
-                'X-RateLimit-Limit'     => (string) self::LIMIT,
+                'Retry-After' => (string) $retryAfter,
+                'X-RateLimit-Limit' => (string) self::LIMIT,
                 'X-RateLimit-Remaining' => '0',
             ]);
         }
@@ -73,7 +74,7 @@ final class ThrottleIpRequests
         $response = $next($request);
 
         $remaining = max(0, self::LIMIT - $this->limiter->attempts($key));
-        $response->headers->set('X-RateLimit-Limit',     (string) self::LIMIT);
+        $response->headers->set('X-RateLimit-Limit', (string) self::LIMIT);
         $response->headers->set('X-RateLimit-Remaining', (string) $remaining);
 
         return $response;

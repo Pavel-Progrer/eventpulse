@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Tests\EventPulse\Unit\Application\WebhookDestination;
 
 use DateTimeImmutable;
+use EventPulse\Application\Shared\DomainEventDispatcher;
 use EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationCommand;
 use EventPulse\Application\WebhookDestination\Command\RegisterWebhookDestinationHandler;
-use EventPulse\Domain\WebhookDestination\Aggregate\WebhookDestination;
+use EventPulse\Domain\DomainEvent;
 use EventPulse\Domain\WebhookDestination\Enum\WebhookDestinationStatus;
 use EventPulse\Domain\WebhookDestination\Event\WebhookDestinationRegistered;
 use EventPulse\Infrastructure\WebhookDestination\Persistence\InMemoryWebhookDestinationRepository;
-use EventPulse\Application\Shared\DomainEventDispatcher;
 use EventPulse\Tests\Unit\Application\Support\FixedClock;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -30,20 +30,24 @@ use PHPUnit\Framework\TestCase;
 final class RegisterWebhookDestinationHandlerTest extends TestCase
 {
     private const string API_KEY_ID = 'ak-test-0000-0001';
-    private const string URL        = 'https://receiver.example.com/hook';
-    private const string SECRET     = 'super-secret-passphrase-32-chars!';
+
+    private const string URL = 'https://receiver.example.com/hook';
+
+    private const string SECRET = 'super-secret-passphrase-32-chars!';
 
     private InMemoryWebhookDestinationRepository $repository;
+
     private RecordingEventDispatcher $eventDispatcher;
+
     private RegisterWebhookDestinationHandler $handler;
 
     protected function setUp(): void
     {
-        $this->repository      = new InMemoryWebhookDestinationRepository();
-        $this->eventDispatcher = new RecordingEventDispatcher();
-        $this->handler         = new RegisterWebhookDestinationHandler(
-            repository:      $this->repository,
-            clock:           new FixedClock(new DateTimeImmutable('2026-04-28T12:00:00Z')),
+        $this->repository = new InMemoryWebhookDestinationRepository;
+        $this->eventDispatcher = new RecordingEventDispatcher;
+        $this->handler = new RegisterWebhookDestinationHandler(
+            repository: $this->repository,
+            clock: new FixedClock(new DateTimeImmutable('2026-04-28T12:00:00Z')),
             eventDispatcher: $this->eventDispatcher,
         );
     }
@@ -112,16 +116,16 @@ final class RegisterWebhookDestinationHandlerTest extends TestCase
     // ---------------------------------------------------------------------------
 
     private function command(
-        string $url            = self::URL,
-        string $secret         = self::SECRET,
-        ?string $name          = 'My hook',
+        string $url = self::URL,
+        string $secret = self::SECRET,
+        ?string $name = 'My hook',
         ?string $correlationId = 'corr-test-001',
     ): RegisterWebhookDestinationCommand {
         return new RegisterWebhookDestinationCommand(
-            apiKeyId:      self::API_KEY_ID,
-            url:           $url,
-            secret:        $secret,
-            name:          $name,
+            apiKeyId: self::API_KEY_ID,
+            url: $url,
+            secret: $secret,
+            name: $name,
             correlationId: $correlationId,
         );
     }
@@ -136,11 +140,11 @@ final class RegisterWebhookDestinationHandlerTest extends TestCase
  */
 final class RecordingEventDispatcher implements DomainEventDispatcher
 {
-    /** @var \EventPulse\Domain\DomainEvent[] */
+    /** @var DomainEvent[] */
     public array $dispatched = [];
 
     #[\Override]
-    public function dispatch(\EventPulse\Domain\DomainEvent $event): void
+    public function dispatch(DomainEvent $event): void
     {
         $this->dispatched[] = $event;
     }

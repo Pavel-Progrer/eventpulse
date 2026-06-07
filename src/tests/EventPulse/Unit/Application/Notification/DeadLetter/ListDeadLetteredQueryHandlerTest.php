@@ -9,10 +9,10 @@ use EventPulse\Application\Notification\DeadLetter\Query\DlqEntry;
 use EventPulse\Application\Notification\DeadLetter\Query\ListDeadLetteredQuery;
 use EventPulse\Application\Notification\DeadLetter\Query\ListDeadLetteredQueryHandler;
 use EventPulse\Domain\Notification\Enum\Channel;
+use EventPulse\Tests\Unit\Application\Support\InMemoryDeadLetteredNotificationsRepository;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use EventPulse\Tests\Unit\Application\Support\InMemoryDeadLetteredNotificationsRepository;
 
 /**
  * Coverage for the list-DLQ use case at the application boundary.
@@ -33,14 +33,15 @@ use EventPulse\Tests\Unit\Application\Support\InMemoryDeadLetteredNotificationsR
 final class ListDeadLetteredQueryHandlerTest extends TestCase
 {
     private InMemoryDeadLetteredNotificationsRepository $repository;
+
     private ListDeadLetteredQueryHandler $handler;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->repository = new InMemoryDeadLetteredNotificationsRepository();
-        $this->handler    = new ListDeadLetteredQueryHandler($this->repository);
+        $this->repository = new InMemoryDeadLetteredNotificationsRepository;
+        $this->handler = new ListDeadLetteredQueryHandler($this->repository);
     }
 
     #[Test]
@@ -91,7 +92,7 @@ final class ListDeadLetteredQueryHandlerTest extends TestCase
 
         $page = ($this->handler)(new ListDeadLetteredQuery(
             apiKeyId: 'key-a',
-            reason:   'unrecoverable_error',
+            reason: 'unrecoverable_error',
         ));
 
         self::assertCount(1, $page->entries);
@@ -107,7 +108,7 @@ final class ListDeadLetteredQueryHandlerTest extends TestCase
 
         $page = ($this->handler)(new ListDeadLetteredQuery(
             apiKeyId: 'key-a',
-            channel:  Channel::Sms,
+            channel: Channel::Sms,
         ));
 
         self::assertCount(1, $page->entries);
@@ -122,8 +123,8 @@ final class ListDeadLetteredQueryHandlerTest extends TestCase
         $this->repository->add('key-a', $this->entry(id: 'c', at: '12:00:00'));
 
         $page = ($this->handler)(new ListDeadLetteredQuery(
-            apiKeyId:      'key-a',
-            createdAfter:  new DateTimeImmutable('2026-04-27T10:00:00Z'),
+            apiKeyId: 'key-a',
+            createdAfter: new DateTimeImmutable('2026-04-27T10:00:00Z'),
             createdBefore: new DateTimeImmutable('2026-04-27T11:00:00Z'),
         ));
 
@@ -146,29 +147,29 @@ final class ListDeadLetteredQueryHandlerTest extends TestCase
 
         self::assertCount(2, $first->entries);
         self::assertNotNull($first->nextCursor);
-        $firstIds = array_map(static fn(DlqEntry $e): string => $e->id, $first->entries);
+        $firstIds = array_map(static fn (DlqEntry $e): string => $e->id, $first->entries);
 
         // Second page using the cursor — gets the next two, returns a cursor.
         $second = ($this->handler)(new ListDeadLetteredQuery(
             apiKeyId: 'key-a',
-            limit:    2,
-            cursor:   $first->nextCursor,
+            limit: 2,
+            cursor: $first->nextCursor,
         ));
 
         self::assertCount(2, $second->entries);
         self::assertNotNull($second->nextCursor);
-        $secondIds = array_map(static fn(DlqEntry $e): string => $e->id, $second->entries);
+        $secondIds = array_map(static fn (DlqEntry $e): string => $e->id, $second->entries);
 
         // Third page using the cursor — gets the last one, no more cursor.
         $third = ($this->handler)(new ListDeadLetteredQuery(
             apiKeyId: 'key-a',
-            limit:    2,
-            cursor:   $second->nextCursor,
+            limit: 2,
+            cursor: $second->nextCursor,
         ));
 
         self::assertCount(1, $third->entries);
         self::assertNull($third->nextCursor, 'last page has no next cursor');
-        $thirdIds = array_map(static fn(DlqEntry $e): string => $e->id, $third->entries);
+        $thirdIds = array_map(static fn (DlqEntry $e): string => $e->id, $third->entries);
 
         // No id appears across any two pages.
         self::assertCount(
@@ -211,14 +212,14 @@ final class ListDeadLetteredQueryHandlerTest extends TestCase
         ?Channel $channel = null,
     ): DlqEntry {
         return new DlqEntry(
-            id:                   $id,
-            notificationId:       $id,
-            reason:               $reason ?? 'max_retries_exceeded',
-            channel:              $channel ?? Channel::Email,
-            deadLetteredAt:       new DateTimeImmutable("2026-04-27T{$at}Z"),
-            finalAttemptAt:       new DateTimeImmutable("2026-04-27T{$at}Z"),
+            id: $id,
+            notificationId: $id,
+            reason: $reason ?? 'max_retries_exceeded',
+            channel: $channel ?? Channel::Email,
+            deadLetteredAt: new DateTimeImmutable("2026-04-27T{$at}Z"),
+            finalAttemptAt: new DateTimeImmutable("2026-04-27T{$at}Z"),
             replayNotificationId: null,
-            replayedAt:           null,
+            replayedAt: null,
         );
     }
 }

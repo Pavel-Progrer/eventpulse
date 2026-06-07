@@ -53,26 +53,33 @@ use Tests\TestCase;
 final class DispatchNotificationJobTest extends TestCase
 {
     private InMemoryNotificationRepository $repository;
+
     private InMemoryNotificationDispatchQueue $dispatchQueue;
+
     private FakeChannelDriver $emailDriver;
+
     private FakeChannelDriver $webhookDriver;
+
     private FakeChannelDriver $smsDriver;
+
     private ChannelDispatcher $channelDispatcher;
+
     private FixedClock $clock;
+
     private DomainEventDispatcher $eventDispatcher;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->repository    = new InMemoryNotificationRepository();
-        $this->dispatchQueue = new InMemoryNotificationDispatchQueue();
+        $this->repository = new InMemoryNotificationRepository;
+        $this->dispatchQueue = new InMemoryNotificationDispatchQueue;
 
         // Default each driver to "succeeded" — tests that exercise
         // failure paths reconfigure the driver they care about.
-        $this->emailDriver   = new FakeChannelDriver(Channel::Email,   DispatchOutcome::success('mid-email'));
+        $this->emailDriver = new FakeChannelDriver(Channel::Email, DispatchOutcome::success('mid-email'));
         $this->webhookDriver = new FakeChannelDriver(Channel::Webhook, DispatchOutcome::success('mid-webhook'));
-        $this->smsDriver     = new FakeChannelDriver(Channel::Sms,     DispatchOutcome::success('mid-sms'));
+        $this->smsDriver = new FakeChannelDriver(Channel::Sms, DispatchOutcome::success('mid-sms'));
 
         $this->channelDispatcher = new ChannelDispatcher([
             $this->emailDriver,
@@ -80,8 +87,8 @@ final class DispatchNotificationJobTest extends TestCase
             $this->smsDriver,
         ]);
 
-        $this->clock           = FixedClock::at('2026-04-25T10:00:00Z');
-        $this->eventDispatcher = new NullDomainEventDispatcher();
+        $this->clock = FixedClock::at('2026-04-25T10:00:00Z');
+        $this->eventDispatcher = new NullDomainEventDispatcher;
     }
 
     #[Test]
@@ -96,7 +103,7 @@ final class DispatchNotificationJobTest extends TestCase
         // the contract just as strictly without that coupling.
         $job = new DispatchNotificationJob(
             notificationId: NotificationId::generate()->toString(),
-            correlationId:  'cor-doesnt-matter',
+            correlationId: 'cor-doesnt-matter',
         );
 
         $thrown = null;
@@ -287,10 +294,10 @@ final class DispatchNotificationJobTest extends TestCase
         ));
 
         $policy = StaticRetryPolicy::perChannel(
-            defaultMax:           1,
-            defaultDelaySeconds:  1,
+            defaultMax: 1,
+            defaultDelaySeconds: 1,
             overrides: [
-                Channel::Email->value   => ['max' => 4, 'delay_seconds' => 30],
+                Channel::Email->value => ['max' => 4, 'delay_seconds' => 30],
                 Channel::Webhook->value => ['max' => 6, 'delay_seconds' => 10],
             ],
         );
@@ -323,10 +330,10 @@ final class DispatchNotificationJobTest extends TestCase
         ));
 
         $policy = StaticRetryPolicy::perChannel(
-            defaultMax:           1,
-            defaultDelaySeconds:  1,
+            defaultMax: 1,
+            defaultDelaySeconds: 1,
             overrides: [
-                Channel::Email->value   => ['max' => 4, 'delay_seconds' => 30],
+                Channel::Email->value => ['max' => 4, 'delay_seconds' => 30],
                 Channel::Webhook->value => ['max' => 6, 'delay_seconds' => 10],
             ],
         );
@@ -376,13 +383,13 @@ final class DispatchNotificationJobTest extends TestCase
     private function runJob(DispatchNotificationJob $job, RetryPolicy $retryPolicy): void
     {
         $job->handle(
-            repository:        $this->repository,
+            repository: $this->repository,
             channelDispatcher: $this->channelDispatcher,
-            clock:             $this->clock,
-            eventDispatcher:   $this->eventDispatcher,
-            retryPolicy:       $retryPolicy,
-            dispatchQueue:     $this->dispatchQueue,
-            logger:            new NullLogger(),
+            clock: $this->clock,
+            eventDispatcher: $this->eventDispatcher,
+            retryPolicy: $retryPolicy,
+            dispatchQueue: $this->dispatchQueue,
+            logger: new NullLogger,
         );
     }
 
@@ -390,7 +397,7 @@ final class DispatchNotificationJobTest extends TestCase
     {
         return new DispatchNotificationJob(
             notificationId: $notification->id()->toString(),
-            correlationId:  $notification->correlationId()->toString(),
+            correlationId: $notification->correlationId()->toString(),
         );
     }
 }

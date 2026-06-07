@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace EventPulse\Infrastructure\WebhookDestination\Persistence;
 
 use EventPulse\Domain\WebhookDestination\Aggregate\WebhookDestination;
-use EventPulse\Domain\WebhookDestination\Enum\WebhookDestinationStatus;
 use EventPulse\Domain\WebhookDestination\Repository\WebhookDestinationRepository;
 use EventPulse\Domain\WebhookDestination\ValueObject\WebhookDestinationId;
 
@@ -61,7 +60,7 @@ final class InMemoryWebhookDestinationRepository implements WebhookDestinationRe
     {
         $destination = $this->findById($id, $apiKeyId);
 
-        if ($destination === null || !$destination->isActive()) {
+        if ($destination === null || ! $destination->isActive()) {
             return null;
         }
 
@@ -73,12 +72,11 @@ final class InMemoryWebhookDestinationRepository implements WebhookDestinationRe
     {
         $all = array_values(array_filter(
             $this->store,
-            fn(WebhookDestination $d): bool => $d->apiKeyId() === $apiKeyId,
+            fn (WebhookDestination $d): bool => $d->apiKeyId() === $apiKeyId,
         ));
 
         // Newest first.
-        usort($all, fn(WebhookDestination $a, WebhookDestination $b): int =>
-            $b->createdAt() <=> $a->createdAt()
+        usort($all, fn (WebhookDestination $a, WebhookDestination $b): int => $b->createdAt() <=> $a->createdAt()
         );
 
         if ($afterId !== null) {
